@@ -1,6 +1,6 @@
 // Purpose: Handle command line arguments
-use crate::errors;
 use crate::commands;
+use crate::errors;
 
 pub struct Config {
     pub arg: String,
@@ -13,31 +13,33 @@ impl Config {
             return Err("usage");
         }
 
-        if ! args[0].starts_with("-") {
+        if !args[0].starts_with("-") {
             return Err("usage");
         }
 
         let arg = args[0].clone();
         let values: Vec<String> = args[1..].to_vec();
 
-        return Ok(Config { arg, values })
+        return Ok(Config { arg, values });
     }
 }
 
-pub fn handle_args(config: Config) {
+pub async fn handle_args(config: Config) {
     match config.arg.as_str() {
-        "-S" => 
+        "-S" => {
             if config.values.len() == 0 {
                 errors::handle_error("no packages specified");
             } else {
                 commands::handle_install(config.values)
             }
-        "-Ss" => 
+        }
+        "-Ss" => {
             if config.values.len() == 0 {
                 errors::handle_error("no packages specified");
             } else {
-                commands::handle_search(config.values[0].clone())
+                commands::handle_search(config.values[0].clone()).await;
             }
+        }
         "-Syu" => commands::handle_update(),
         _ => errors::handle_error(config.arg.as_str()),
     }

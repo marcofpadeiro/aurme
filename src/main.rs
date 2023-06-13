@@ -1,10 +1,12 @@
 use std::env;
 
 mod cmd;
-mod errors;
 mod commands;
+mod errors;
+mod helpers;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
 
     let config = cmd::Config::build(&args).unwrap_or_else(|err| {
@@ -12,10 +14,9 @@ fn main() {
         std::process::exit(1);
     });
 
-    run(config);
+    run(config).await;
 }
 
-fn run(config: cmd::Config) {
-    cmd::handle_args(config);
+async fn run(config: cmd::Config) {
+    cmd::handle_args(config).await;
 }
-
