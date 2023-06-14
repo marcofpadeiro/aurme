@@ -1,8 +1,10 @@
 use crate::errors;
 use crate::helpers;
+use crate::helpers::check_n_clone;
 use crate::helpers::Package;
 use crate::helpers::AUR_URL;
 use select::document::Document;
+use std::io::{self, Write};
 
 // Purpose: Handle the commands passed to the program.
 pub fn handle_install(values: Vec<String>) {
@@ -10,7 +12,7 @@ pub fn handle_install(values: Vec<String>) {
         errors::handle_error("no packages specified");
     }
 
-    println!("Installing: {:?}", values);
+    println!("Installing: {:?}", values)
 }
 
 pub async fn handle_search(query: String) {
@@ -39,8 +41,12 @@ pub async fn handle_search(query: String) {
         .map(|(name, description)| Package::new(name.to_string(), description.to_string()))
         .collect();
 
+    if packages.len() == 0 {
+        println!("No packages found");
+        return;
+    }
+
     // print packages
-    // TODO: ask if user wants to install any of the packages 1-10 or (q)uit
     for (i, package) in packages.iter().enumerate() {
         println!(
             "\n{}: {}\n  {}",
@@ -48,6 +54,34 @@ pub async fn handle_search(query: String) {
             package.get_name(),
             package.get_description()
         );
+    }
+
+    print!("Install package(s) (1-10) or (q)uit: ");
+    io::stdout().flush().unwrap();
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+
+    let input = input.trim();
+
+    if input == "q" {
+        return;
+    }
+
+    let parsed_input: Result<usize, _> = input.parse();
+
+    match parsed_input {
+        Ok(i) => {
+            if i > 0 && i <= packages.len() {
+                match check_n_clone(packages[i - 1].get_name()) {
+                    Ok(_) => println!("Package installed"),
+                    Err(e) => println!("Error: {}", e),
+                }
+            } else {
+                println!("Invalid input");
+            }
+        }
+        Err(_) => println!("Invalid input"),
     }
 }
 
