@@ -1,4 +1,5 @@
 use reqwest;
+use serde_json::Value;
 use std::process::Command;
 
 // variables and structs for ease of use
@@ -133,23 +134,30 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
 pub async fn check_for_updates(
     package: &Package,
 ) -> Result<(bool, String), Box<dyn std::error::Error>> {
-    let url = format!("{}/packages/{}", AUR_URL, package.get_name());
-    let res = fetch(&url).await.unwrap();
+    let url = format!(
+        "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
+        package.get_name()
+    );
 
-    let re = regex::Regex::new(r"<h2>Package Details: [^<]+ (.+)</h2>").unwrap();
+    let response = reqwest::get(&url).await?.text().await?;
 
-    if let Some(captures) = re.captures(&res) {
-        if let Some(version) = captures.get(1) {
-            Ok((
-                version.as_str() != package.get_version(),
-                version.as_str().to_owned(),
-            ))
-        } else {
-            Err("No version found".into())
-        }
-    } else {
-        Err("Couldn't get most recent version".into())
-    }
+    let json: Value = serde_json::from_str(&response)?;
+
+    let version = json
+        .get("results")
+        .and_then(|results| {
+            results.as_array().and_then(|results_array| {
+                results_array
+                    .iter()
+                    .find(|result| result["Name"] == package.get_name())
+            })
+        })
+        .and_then(|result| result.get("Version"))
+        .and_then(|version| version.as_str())
+        .ok_or("Invalid JSON response or version not found")?
+        .to_owned();
+
+    Ok((package.get_version() != version, version))
 }
 
 pub fn check_if_package_in_cache(package_name: &str) -> bool {
