@@ -62,9 +62,6 @@ pub fn get_git_url(package_name: &str) -> String {
 pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let clone_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
     let package_path: String = format!("{}/{}", clone_path, package_name);
-    // shadowing the variables to drop the old values of memory
-    let clone_path: &str = clone_path.as_str();
-    let package_path: &str = package_path.as_str();
 
     let git_check = Command::new("git").arg("--version").output()?;
     if !git_check.status.success() {
@@ -72,13 +69,13 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
         std::process::exit(1);
     }
 
-    if !std::path::Path::new(clone_path).exists() {
-        std::fs::create_dir(clone_path).expect("Failed to create cache directory");
+    if !std::path::Path::new(clone_path.as_str()).exists() {
+        std::fs::create_dir(clone_path.as_str()).expect("Failed to create cache directory");
     }
 
     //// if dir with package name already exists, delete it
-    if std::path::Path::new(package_path).exists() {
-        std::fs::remove_dir_all(package_path).expect("Failed to remove old package");
+    if std::path::Path::new(package_path.as_str()).exists() {
+        std::fs::remove_dir_all(package_path.as_str()).expect("Failed to remove old package");
     }
 
     // specify the directory to clone the package to
