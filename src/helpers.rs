@@ -49,11 +49,7 @@ pub async fn check_package(package_name: &str) -> Result<bool, Box<dyn std::erro
     let url = format!("{}/packages/{}", AUR_URL, package_name);
     let res = fetch(&url).await.unwrap();
 
-    if res.contains("id=\"error-page\"") {
-        Ok(false)
-    } else {
-        Ok(true)
-    }
+    Ok(!res.contains("id=\"error-page\""))
 }
 
 /**
