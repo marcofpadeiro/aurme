@@ -40,7 +40,7 @@ pub async fn handle_args(config: Config) {
                 commands::handle_search(config.values[0].clone()).await;
             }
         }
-        "-Syu" => commands::handle_update(),
+        "-Syu" => commands::handle_update().await,
         _ => errors::handle_error(config.arg.as_str()),
     }
 }
