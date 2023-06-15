@@ -69,13 +69,13 @@ pub fn get_git_url(package_name: &str) -> String {
 * @param package_name: the name of the package
 */
 pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let clone_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
-    let package_path: String = format!("{}/{}", clone_path, package_name);
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
+    let package_path: String = format!("{}/{}", cache_path, package_name);
 
     check_dependency("git");
 
-    if !std::path::Path::new(clone_path.as_str()).exists() {
-        std::fs::create_dir(clone_path.as_str()).expect("Failed to create cache directory");
+    if !std::path::Path::new(cache_path.as_str()).exists() {
+        std::fs::create_dir(cache_path.as_str()).expect("Failed to create cache directory");
     }
 
     //// if dir with package name already exists, delete it
@@ -155,8 +155,8 @@ pub async fn check_for_updates(
 }
 
 pub fn check_if_package_in_cache(package_name: &str) -> bool {
-    let clone_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
-    let package_path: String = format!("{}/{}", clone_path, package_name);
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
+    let package_path: String = format!("{}/{}", cache_path, package_name);
 
     std::path::Path::new(package_path.as_str()).exists()
 }
@@ -217,7 +217,6 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     check_dependency("fakeroot");
     check_dependency("make");
 
-    // cd into package, pull changes
     let exit_status = Command::new("makepkg")
         .arg("-si")
         .arg("--noconfirm")

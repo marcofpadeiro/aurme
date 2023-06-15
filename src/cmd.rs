@@ -41,6 +41,7 @@ pub async fn handle_args(config: Config) {
             }
         }
         "-Syu" => commands::handle_update().await,
+        "-Sc" => commands::handle_cache_delete().await,
         _ => errors::handle_error(config.arg.as_str()),
     }
 }

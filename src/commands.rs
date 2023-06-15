@@ -180,3 +180,21 @@ pub async fn handle_update() {
         }
     }
 }
+
+pub async fn handle_cache_delete() {
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
+    let cache_path = std::path::Path::new(&cache_path);
+
+    // delete every folder in the cache_path
+    for entry in std::fs::read_dir(cache_path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            std::fs::remove_dir_all(path).unwrap();
+        } else {
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+
+    println!("Successfully cleared cache");
+}
