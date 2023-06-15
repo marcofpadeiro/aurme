@@ -49,11 +49,7 @@ pub async fn check_package(package_name: &str) -> Result<bool, Box<dyn std::erro
     let url = format!("{}/packages/{}", AUR_URL, package_name);
     let res = fetch(&url).await.unwrap();
 
-    if res.contains("id=\"error-page\"") {
-        return Ok(false);
-    } else {
-        Ok(true)
-    }
+    Ok(!res.contains("id=\"error-page\""))
 }
 
 /**
@@ -95,8 +91,10 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
         Err(String::from_utf8_lossy(&exit_status.stderr).into())
     } else {
         println!("Successfully cloned package: {}", package_name);
-        // maybe call the install function here
-        Ok(())
+        match makepkg(&package_name) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 
