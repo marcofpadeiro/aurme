@@ -146,4 +146,37 @@ pub async fn handle_update() {
             package.1
         );
     }
+
+    print!("\nProceed with update? [Y/n]:");
+    io::stdout().flush().unwrap();
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+
+    let input = input.trim();
+
+    if input != "" && input != "y" && input != "Y" {
+        println!("Aborting...");
+        return;
+    }
+
+    for package in packages_need_updates.iter() {
+        if helpers::check_if_package_in_cache(package.0.get_name()) {
+            match helpers::pull_cached_package(package.0.get_name()) {
+                Ok(_) => match helpers::makepkg(package.0.get_name()) {
+                    Ok(_) => eprintln!("Successfully updated {}", package.0.get_name()),
+                    Err(e) => println!("Error: {}", e),
+                },
+                Err(e) => println!("Error: {}", e),
+            }
+        } else {
+            match clone_package(package.0.get_name()) {
+                Ok(_) => match helpers::makepkg(package.0.get_name()) {
+                    Ok(_) => eprintln!("Successfully updated {}", package.0.get_name()),
+                    Err(e) => println!("Error: {}", e),
+                },
+                Err(e) => println!("Error: {}", e),
+            }
+        }
+    }
 }
