@@ -16,14 +16,10 @@ pub async fn handle_install(values: Vec<String>) {
     let mut non_existent_packages: Vec<&str> = Vec::new();
 
     for package in values.iter() {
-        match check_package(&package).await {
-            Ok(exists) => {
-                if !exists {
-                    non_existent_packages.push(&package);
-                }
+        if let Ok(exists) = check_package(&package).await {
+            if !exists {
+                non_existent_packages.push(&package);
             }
-            // should never happen
-            Err(_) => {}
         }
     }
 
@@ -35,12 +31,12 @@ pub async fn handle_install(values: Vec<String>) {
         return;
     }
 
-    for package in values.iter() {
-        match clone_package(&package) {
+    values
+        .iter()
+        .for_each(|package| match clone_package(&package) {
             Ok(_) => println!("Package installed"),
             Err(e) => println!("Error: {}", e),
-        }
-    }
+        });
 }
 
 pub async fn handle_search(query: String) {
@@ -77,14 +73,14 @@ pub async fn handle_search(query: String) {
     }
 
     // print packages
-    for (i, package) in packages.iter().enumerate() {
+    packages.iter().enumerate().for_each(|(i, package)| {
         println!(
             "\n{}: {}\n  {}",
             i + 1,
             package.get_name(),
             package.get_description()
         );
-    }
+    });
 
     print!("Install package(s) (1-10) or (q)uit: ");
     io::stdout().flush().unwrap();
@@ -138,14 +134,14 @@ pub async fn handle_update() {
     }
 
     println!("Packages ({}) ", packages_need_updates.len());
-    for package in packages_need_updates.iter() {
+    packages_need_updates.iter().for_each(|package| {
         println!(
             "   {} ({} -> {})",
             package.0.get_name(),
             package.0.get_version(),
             package.1
         );
-    }
+    });
 
     print!("\nProceed with update? [Y/n]:");
     io::stdout().flush().unwrap();
@@ -160,7 +156,7 @@ pub async fn handle_update() {
         return;
     }
 
-    for package in packages_need_updates.iter() {
+    packages_need_updates.iter().for_each(|package| {
         if helpers::check_if_package_in_cache(package.0.get_name()) {
             match helpers::pull_cached_package(package.0.get_name()) {
                 Ok(_) => match helpers::makepkg(package.0.get_name()) {
@@ -178,7 +174,7 @@ pub async fn handle_update() {
                 Err(e) => println!("Error: {}", e),
             }
         }
-    }
+    });
 }
 
 pub async fn handle_cache_delete() {
@@ -186,7 +182,7 @@ pub async fn handle_cache_delete() {
     let cache_path = std::path::Path::new(&cache_path);
 
     // delete every folder in the cache_path
-    for entry in std::fs::read_dir(cache_path).unwrap() {
+    std::fs::read_dir(cache_path).unwrap().for_each(|entry| {
         let entry = entry.unwrap();
         let path = entry.path();
         if path.is_dir() {
@@ -194,7 +190,7 @@ pub async fn handle_cache_delete() {
         } else {
             std::fs::remove_file(path).unwrap();
         }
-    }
+    });
 
     println!("Successfully cleared cache");
 }
