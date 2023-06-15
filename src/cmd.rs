@@ -30,7 +30,7 @@ pub async fn handle_args(config: Config) {
             if config.values.len() == 0 {
                 errors::handle_error("no packages specified");
             } else {
-                commands::handle_install(config.values)
+                commands::handle_install(config.values).await;
             }
         }
         "-Ss" => {
