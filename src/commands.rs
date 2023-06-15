@@ -1,18 +1,46 @@
 use crate::errors;
 use crate::helpers;
-use crate::helpers::check_n_clone;
+use crate::helpers::check_package;
+use crate::helpers::clone_package;
 use crate::helpers::Package;
 use crate::helpers::AUR_URL;
 use select::document::Document;
 use std::io::{self, Write};
 
 // Purpose: Handle the commands passed to the program.
-pub fn handle_install(values: Vec<String>) {
+pub async fn handle_install(values: Vec<String>) {
     if values.len() == 0 {
         errors::handle_error("no packages specified");
     }
 
-    println!("Installing: {:?}", values)
+    let mut non_existent_packages: Vec<&str> = Vec::new();
+
+    for package in values.iter() {
+        match check_package(&package).await {
+            Ok(exists) => {
+                if !exists {
+                    non_existent_packages.push(&package);
+                }
+            }
+            // should never happen
+            Err(_) => {}
+        }
+    }
+
+    if non_existent_packages.len() > 0 {
+        println!("The following packages do not exist in the AUR:");
+        for package in non_existent_packages.iter() {
+            println!("{}", package);
+        }
+        return;
+    }
+
+    for package in values.iter() {
+        match clone_package(&package) {
+            Ok(_) => println!("Package installed"),
+            Err(e) => println!("Error: {}", e),
+        }
+    }
 }
 
 pub async fn handle_search(query: String) {
@@ -64,7 +92,7 @@ pub async fn handle_search(query: String) {
 
     let input = input.trim();
 
-    if input == "q" {
+    if input == "q" || input == "quit" {
         return;
     }
 
@@ -73,7 +101,7 @@ pub async fn handle_search(query: String) {
     match parsed_input {
         Ok(i) => {
             if i > 0 && i <= packages.len() {
-                match check_n_clone(packages[i - 1].get_name()) {
+                match clone_package(packages[i - 1].get_name()) {
                     Ok(_) => println!("Package installed"),
                     Err(e) => println!("Error: {}", e),
                 }

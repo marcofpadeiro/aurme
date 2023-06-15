@@ -40,7 +40,6 @@ pub async fn check_package(package_name: &str) -> Result<bool, Box<dyn std::erro
     let url = format!("{}/packages/{}", AUR_URL, package_name);
     let res = fetch(&url).await.unwrap();
 
-    // look for div with id=error-page
     if res.contains("id=\"error-page\"") {
         return Ok(false);
     } else {
@@ -60,7 +59,7 @@ pub fn get_git_url(package_name: &str) -> String {
 * Clone a package from the AUR
 * @param package_name: the name of the package
 */
-pub fn check_n_clone(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let git_check = Command::new("git").arg("--version").output()?;
     if !git_check.status.success() {
         std::eprintln!("Git is not installed, please install it first");
@@ -78,6 +77,7 @@ pub fn check_n_clone(package_name: &str) -> Result<(), Box<dyn std::error::Error
         Err(String::from_utf8_lossy(&exit_status.stderr).into())
     } else {
         println!("Successfully cloned package: {}", package_name);
+        // maybe call the install function here
         Ok(())
     }
 }
