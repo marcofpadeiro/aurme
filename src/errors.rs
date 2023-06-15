@@ -12,11 +12,14 @@ pub fn handle_error(err: &str) {
 }
 
 fn handle_usage() {
-    println!("Usage: aur <flags> <values>
+    println!(
+        "Usage: aur <flags> <values>
     Flags:
         -S <package>    Install package
         -Ss <package>   Search for package
-        -Syu            Update aur packages");
+        -Syu            Update aur packages
+        -Sc             Clear cache"
+    );
 }
 
 fn handle_no_packages_specified() {
