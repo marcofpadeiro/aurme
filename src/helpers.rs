@@ -6,12 +6,17 @@ pub const AUR_URL: &str = "https://aur.archlinux.org";
 
 pub struct Package {
     name: String,
+    version: String,
     description: String,
 }
 
 impl Package {
-    pub fn new(name: String, description: String) -> Package {
-        Package { name, description }
+    pub fn new(name: String, description: String, version: String) -> Package {
+        Package {
+            name,
+            description,
+            version,
+        }
     }
 
     pub fn get_name(&self) -> &str {
@@ -20,6 +25,10 @@ impl Package {
 
     pub fn get_description(&self) -> &str {
         &self.description
+    }
+
+    pub fn get_version(&self) -> &str {
+        &self.version
     }
 }
 
@@ -92,5 +101,59 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
         println!("Successfully cloned package: {}", package_name);
         // maybe call the install function here
         Ok(())
+    }
+}
+
+pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Error>> {
+    let installed_packages_output = Command::new("pacman")
+        .arg("-Qm")
+        .output()
+        .expect("Failed to get installed packages");
+
+    // Extract the installed packages as a string
+    let installed_packages_str = std::str::from_utf8(&installed_packages_output.stdout)?;
+
+    // Split the string into individual package names
+    let package_lines: Vec<&str> = installed_packages_str.trim().split('\n').collect();
+
+    // Split each line into name and version
+    let installed_packages: Vec<Package> = package_lines
+        .into_iter()
+        .map(|package_line| {
+            let mut package_parts = package_line.split_whitespace();
+            let name = package_parts.next().unwrap_or("").to_owned();
+            let version = package_parts.next().unwrap_or("").to_owned();
+            let description = name.clone();
+
+            Package {
+                name,
+                description,
+                version,
+            }
+        })
+        .collect();
+
+    Ok(installed_packages)
+}
+
+pub async fn check_for_updates(
+    package: &Package,
+) -> Result<(bool, String), Box<dyn std::error::Error>> {
+    let url = format!("{}/packages/{}", AUR_URL, package.get_name());
+    let res = fetch(&url).await.unwrap();
+
+    let re = regex::Regex::new(r"<h2>Package Details: [^<]+ (.+)</h2>").unwrap();
+
+    if let Some(captures) = re.captures(&res) {
+        if let Some(version) = captures.get(1) {
+            Ok((
+                version.as_str() != package.get_version(),
+                version.as_str().to_owned(),
+            ))
+        } else {
+            Err("No version found".into())
+        }
+    } else {
+        Err("Couldn't get most recent version".into())
     }
 }

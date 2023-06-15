@@ -66,7 +66,9 @@ pub async fn handle_search(query: String) {
     let packages: Vec<Package> = names
         .iter()
         .zip(descriptions.iter())
-        .map(|(name, description)| Package::new(name.to_string(), description.to_string()))
+        .map(|(name, description)| {
+            Package::new(name.to_string(), description.to_string(), "1".to_string())
+        })
         .collect();
 
     if packages.len() == 0 {
@@ -113,6 +115,35 @@ pub async fn handle_search(query: String) {
     }
 }
 
-pub fn handle_update() {
-    println!("Updating...");
+pub async fn handle_update() {
+    println!("Checking for updates...");
+    let installed_packages: Vec<helpers::Package> =
+        helpers::get_installed_packages().expect("Error getting installed packages");
+
+    let mut packages_need_updates: Vec<(&helpers::Package, String)> = Vec::new(); // Use a reference to the package
+
+    for package in installed_packages.iter() {
+        let needs_update = helpers::check_for_updates(package)
+            .await
+            .expect("Error checking for updates");
+
+        if needs_update.0 {
+            packages_need_updates.push((package, needs_update.1));
+        }
+    }
+
+    if packages_need_updates.len() == 0 {
+        println!("No updates available");
+        return;
+    }
+
+    println!("Packages ({}) ", packages_need_updates.len());
+    for package in packages_need_updates.iter() {
+        println!(
+            "   {} ({} -> {})",
+            package.0.get_name(),
+            package.0.get_version(),
+            package.1
+        );
+    }
 }
