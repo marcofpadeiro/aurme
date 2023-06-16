@@ -1,10 +1,8 @@
 use crate::errors;
 use crate::helpers;
-use crate::helpers::check_package;
+use crate::helpers::check_package_existance;
 use crate::helpers::clone_package;
-use crate::helpers::Package;
-use crate::helpers::AUR_URL;
-use select::document::Document;
+use crate::package;
 use std::io::{self, Write};
 
 // Purpose: Handle the commands passed to the program.
@@ -16,7 +14,7 @@ pub async fn handle_install(values: Vec<String>) {
     let mut non_existent_packages: Vec<&str> = Vec::new();
 
     for package in values.iter() {
-        if let Ok(exists) = check_package(&package).await {
+        if let Ok(exists) = check_package_existance(&package).await {
             if !exists {
                 non_existent_packages.push(&package);
             }
@@ -40,32 +38,7 @@ pub async fn handle_install(values: Vec<String>) {
 }
 
 pub async fn handle_search(query: String) {
-    let url = format!("{}/packages/?K={}", AUR_URL, query);
-    let res = helpers::fetch(&url).await.unwrap();
-
-    let names: Vec<String> = Document::from(res.as_str())
-        .find(select::predicate::Name("tr"))
-        .flat_map(|n| n.find(select::predicate::Name("td")))
-        .flat_map(|n| n.find(select::predicate::Name("a")))
-        .take(10)
-        .map(|n| n.text().trim().to_string())
-        .collect();
-
-    let descriptions: Vec<String> = Document::from(res.as_str())
-        .find(select::predicate::Name("tr"))
-        .flat_map(|n| n.find(select::predicate::Name("td")))
-        .filter(|n| n.attr("class").unwrap_or("") == "wrap")
-        .take(10)
-        .map(|n| n.text().trim().to_string())
-        .collect();
-
-    let packages: Vec<Package> = names
-        .iter()
-        .zip(descriptions.iter())
-        .map(|(name, description)| {
-            Package::new(name.to_string(), description.to_string(), "1".to_string())
-        })
-        .collect();
+    let packages = helpers::get_top_packages(&query).await;
 
     if packages.len() == 0 {
         println!("No packages found");
@@ -113,18 +86,19 @@ pub async fn handle_search(query: String) {
 
 pub async fn handle_update() {
     println!("Checking for updates...");
-    let installed_packages: Vec<helpers::Package> =
+    let installed_packages: Vec<package::Package> =
         helpers::get_installed_packages().expect("Error getting installed packages");
 
-    let mut packages_need_updates: Vec<(&helpers::Package, String)> = Vec::new(); // Use a reference to the package
+    let mut packages_need_updates: Vec<(&package::Package, String)> = Vec::new(); // Use a reference to the package
 
     for package in installed_packages.iter() {
-        let needs_update = helpers::check_for_updates(package)
+        let (needs_update, version) = package
+            .check_for_updates()
             .await
             .expect("Error checking for updates");
 
-        if needs_update.0 {
-            packages_need_updates.push((package, needs_update.1));
+        if needs_update {
+            packages_need_updates.push((package, version));
         }
     }
 
@@ -134,12 +108,12 @@ pub async fn handle_update() {
     }
 
     println!("Packages ({}) ", packages_need_updates.len());
-    packages_need_updates.iter().for_each(|package| {
+    packages_need_updates.iter().for_each(|(package, version)| {
         println!(
             "   {} ({} -> {})",
-            package.0.get_name(),
-            package.0.get_version(),
-            package.1
+            package.get_name(),
+            package.get_version(),
+            version
         );
     });
 
@@ -156,21 +130,15 @@ pub async fn handle_update() {
         return;
     }
 
-    packages_need_updates.iter().for_each(|package| {
-        if helpers::check_if_package_in_cache(package.0.get_name()) {
-            match helpers::pull_cached_package(package.0.get_name()) {
-                Ok(_) => match helpers::makepkg(package.0.get_name()) {
-                    Ok(_) => eprintln!("Successfully updated {}", package.0.get_name()),
-                    Err(e) => println!("Error: {}", e),
-                },
+    packages_need_updates.iter().for_each(|(package, _)| {
+        if package.check_if_package_in_cache() {
+            match package.pull_cached_package() {
+                Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
                 Err(e) => println!("Error: {}", e),
             }
         } else {
-            match clone_package(package.0.get_name()) {
-                Ok(_) => match helpers::makepkg(package.0.get_name()) {
-                    Ok(_) => eprintln!("Successfully updated {}", package.0.get_name()),
-                    Err(e) => println!("Error: {}", e),
-                },
+            match clone_package(package.get_name()) {
+                Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
                 Err(e) => println!("Error: {}", e),
             }
         }
