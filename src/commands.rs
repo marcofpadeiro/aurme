@@ -1,3 +1,6 @@
+// File name: commands.rs
+// Purpose: Handle the commands passed to the program by parameters.
+
 use crate::errors;
 use crate::helpers;
 use crate::helpers::check_package_existance;
@@ -5,7 +8,10 @@ use crate::helpers::clone_package;
 use crate::helpers::CACHE_PATH;
 use std::io::{self, Write};
 
-// Purpose: Handle the commands passed to the program.
+/**
+* Handle the install of packages
+* @param values: A vector of strings containing the packages to install
+*/
 pub async fn handle_install(values: Vec<String>) {
     if values.len() == 0 {
         errors::handle_error("no packages specified");
@@ -40,7 +46,15 @@ pub async fn handle_install(values: Vec<String>) {
         });
 }
 
+/**
+* Handle the search of packages
+* @param query: A string containing the package to search for
+*/
 pub async fn handle_search(query: String) {
+    if query.len() == 0 {
+        errors::handle_error("no packages specified");
+    }
+
     let packages = helpers::get_top_packages(&query).await;
 
     if packages.len() == 0 {
@@ -81,6 +95,10 @@ pub async fn handle_search(query: String) {
     }
 }
 
+/**
+* Handle the update of packages
+* @param values: A vector of strings containing the packages to update
+*/
 pub async fn handle_update(values: Vec<String>) {
     println!("Checking for updates...");
 
@@ -149,6 +167,10 @@ pub async fn handle_update(values: Vec<String>) {
         });
 }
 
+/**
+* Handle the deletion of packages from the cache
+* @param values: A vector of strings containing the packages to delete from cache
+*/
 pub async fn handle_cache_delete(packages: Vec<String>) {
     let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
     let cache_path = std::path::Path::new(&cache_path);

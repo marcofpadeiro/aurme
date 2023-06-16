@@ -151,6 +151,11 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     }
 }
 
+/**
+* Checks for updates using threads
+* @param packages: a vector of packages to check for updates
+* @return tuple of package and the new version
+*/
 pub async fn check_for_updates_threads(
     packages: Vec<Package>,
 ) -> Result<Vec<(Package, String)>, Box<dyn std::error::Error>> {
@@ -186,6 +191,7 @@ pub async fn check_for_updates_threads(
 
 /**
 * Checks if a dependency is installed in the system
+* @param dependency_name: the name of the dependency
 */
 pub fn check_dependency(dependency_name: &str) {
     let dependency_check = Command::new("pacman")
@@ -270,6 +276,10 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+/**
+* Remove a package from the cache
+* @param package_name: the name of the package to remove
+*/
 pub fn remove_package_from_cache(package_name: &str) {
     let package_path: String = format!(
         "{}/{}/{}",

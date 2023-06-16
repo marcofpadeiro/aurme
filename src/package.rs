@@ -65,7 +65,6 @@ impl Package {
 
         check_dependency("git");
 
-        // cd into package, pull changes
         let exit_status = Command::new("git")
             .arg("pull")
             .arg("origin")
@@ -83,6 +82,10 @@ impl Package {
             }
         }
     }
+
+    /**
+     * check for package updates
+     */
     pub async fn check_for_package_updates(self) -> Result<(Package, String), String> {
         let url = format!(
             "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",

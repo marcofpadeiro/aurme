@@ -25,20 +25,8 @@ impl Config {
 
     pub async fn handle_args(&self) {
         match self.arg.as_str() {
-            "-S" => {
-                if self.values.len() == 0 {
-                    errors::handle_error("no packages specified");
-                } else {
-                    commands::handle_install(self.values.clone()).await;
-                }
-            }
-            "-Ss" => {
-                if self.values.len() == 0 {
-                    errors::handle_error("no packages specified");
-                } else {
-                    commands::handle_search(self.values[0].clone()).await;
-                }
-            }
+            "-S" => commands::handle_install(self.values.clone()).await,
+            "-Ss" => commands::handle_search(self.values[0].clone()).await,
             "-Syyu" | "-Syu" | "-Sy" | "-Suy" => commands::handle_update(self.values.clone()).await,
             "-Sc" => commands::handle_cache_delete(self.values.clone()).await,
             _ => errors::handle_error(self.arg.as_str()),
