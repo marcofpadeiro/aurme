@@ -1,7 +1,6 @@
 use crate::package::Package;
 use reqwest;
 use select::document::Document;
-use serde_json::Value;
 use std::process::Command;
 use std::sync::Arc;
 
@@ -111,40 +110,52 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
     Ok(installed_packages)
 }
 
-/**
-* Function feed into the thread pool to check for updates for a package
-* @param package: the package to check for updates
-* @return: a tuple of the package and the version of the latest update or an error message
-*/
-pub async fn check_for_package_updates(package: Package) -> Result<(Package, String), String> {
-    let url = format!(
-        "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
-        package.get_name()
-    );
+pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>, Vec<String>> {
+    let installed_packages_output = Command::new("pacman")
+        .arg("-Qm")
+        .output()
+        .expect("Failed to get installed packages");
 
-    let response = reqwest::get(&url).await.expect("asd").text().await;
+    // Extract the installed packages as a string
+    let installed_packages_str = String::from_utf8(installed_packages_output.stdout)
+        .expect("Failed to get installed packages");
 
-    let json: Value = serde_json::from_str(&response.expect("Failed to get response")).unwrap();
+    let mut packages_installed: Vec<Package> = Vec::new();
+    let mut packages_missing: Vec<String> = Vec::new();
 
-    let new_version = json
-        .get("results")
-        .and_then(|results| {
-            results.as_array().and_then(|results_array| {
-                results_array
-                    .iter()
-                    .find(|result| result["Name"] == package.get_name())
-            })
-        })
-        .and_then(|result| result.get("Version"))
-        .and_then(|version| version.as_str())
-        .ok_or_else(|| "Invalid JSON response or version not found".to_string())?;
+    for package in packages {
+        if installed_packages_str.contains(&package) {
+            // Extract the package name and version from the installed packages
+            let parts: Vec<&str> = installed_packages_str
+                .lines()
+                .find(|line| line.starts_with(&package))
+                .map(|line| line.split_whitespace().collect())
+                .unwrap_or_else(Vec::new);
 
-    if package.get_version() != new_version.to_string() {
-        return Ok((package, new_version.to_string()));
+            let package_name = parts[0].to_owned();
+            let package_version = parts[1].to_owned();
+            packages_installed.push(Package::new(
+                package_name.clone(),
+                Some(package_name),
+                Some(package_version),
+            ));
+        } else {
+            packages_missing.push(package);
+        }
     }
-    Err("No update available".to_string())
+
+    if packages_missing.is_empty() {
+        Ok(packages_installed)
+    } else {
+        Err(packages_missing)
+    }
 }
 
+/**
+* Checks for updates using threads
+* @param packages: a vector of packages to check for updates
+* @return tuple of package and the new version
+*/
 pub async fn check_for_updates_threads(
     packages: Vec<Package>,
 ) -> Result<Vec<(Package, String)>, Box<dyn std::error::Error>> {
@@ -153,9 +164,9 @@ pub async fn check_for_updates_threads(
     let mut tasks = Vec::new();
 
     for package in packages.iter() {
-        let package_clone = package.clone();
+        let package = package.clone();
         let task = tokio::spawn(async move {
-            let result = check_for_package_updates(package_clone).await;
+            let result = package.check_for_package_updates().await;
             match result {
                 Ok(result) => Ok(result),
                 Err(e) => Err(e),
@@ -180,6 +191,7 @@ pub async fn check_for_updates_threads(
 
 /**
 * Checks if a dependency is installed in the system
+* @param dependency_name: the name of the dependency
 */
 pub fn check_dependency(dependency_name: &str) {
     let dependency_check = Command::new("pacman")
@@ -262,4 +274,19 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Ok(())
     }
+}
+
+/**
+* Remove a package from the cache
+* @param package_name: the name of the package to remove
+*/
+pub fn remove_package_from_cache(package_name: &str) {
+    let package_path: String = format!(
+        "{}/{}/{}",
+        home::home_dir().unwrap().display(),
+        ".cache/aur",
+        package_name
+    );
+
+    std::fs::remove_dir_all(package_path).unwrap();
 }

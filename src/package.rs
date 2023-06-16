@@ -1,6 +1,7 @@
 use crate::helpers::check_dependency;
 use crate::helpers::makepkg;
 use crate::helpers::CACHE_PATH;
+use serde_json::Value;
 use std::process::Command;
 
 #[derive(Debug, Clone)]
@@ -64,7 +65,6 @@ impl Package {
 
         check_dependency("git");
 
-        // cd into package, pull changes
         let exit_status = Command::new("git")
             .arg("pull")
             .arg("origin")
@@ -81,5 +81,37 @@ impl Package {
                 Err(e) => Err(e),
             }
         }
+    }
+
+    /**
+     * check for package updates
+     */
+    pub async fn check_for_package_updates(self) -> Result<(Package, String), String> {
+        let url = format!(
+            "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
+            &self.get_name()
+        );
+
+        let response = reqwest::get(&url).await.expect("asd").text().await;
+
+        let json: Value = serde_json::from_str(&response.expect("Failed to get response")).unwrap();
+
+        let new_version = json
+            .get("results")
+            .and_then(|results| {
+                results.as_array().and_then(|results_array| {
+                    results_array
+                        .iter()
+                        .find(|result| result["Name"] == self.get_name())
+                })
+            })
+            .and_then(|result| result.get("Version"))
+            .and_then(|version| version.as_str())
+            .ok_or_else(|| "Invalid JSON response or version not found".to_string())?;
+
+        if self.get_version() != new_version.to_string() {
+            return Ok((self, new_version.to_string()));
+        }
+        Err("No update available".to_string())
     }
 }

@@ -15,10 +15,10 @@ fn handle_usage() {
     println!(
         "Usage: aur <flags> <values>
     Flags:
-        -S <package>    Install package
-        -Ss <package>   Search for package
-        -Syu            Update aur packages
-        -Sc             Clear cache"
+        -S <package>      Install package
+        -Ss <package>     Search for package
+        -Syu [packages]   Update aur packages
+        -Sc [packages]    Clear cache"
     );
 }
 
