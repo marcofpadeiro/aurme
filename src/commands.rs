@@ -2,6 +2,7 @@ use crate::errors;
 use crate::helpers;
 use crate::helpers::check_package_existance;
 use crate::helpers::clone_package;
+use crate::helpers::CACHE_PATH;
 use crate::package;
 use std::io::{self, Write};
 
@@ -70,17 +71,11 @@ pub async fn handle_search(query: String) {
     let parsed_input: Result<usize, _> = input.parse();
 
     match parsed_input {
-        Ok(i) => {
-            if i > 0 && i <= packages.len() {
-                match clone_package(packages[i - 1].get_name()) {
-                    Ok(_) => println!("Package installed"),
-                    Err(e) => println!("Error: {}", e),
-                }
-            } else {
-                println!("Invalid input");
-            }
-        }
-        Err(_) => println!("Invalid input"),
+        Ok(i) if i > 0 && i <= packages.len() => match clone_package(packages[i - 1].get_name()) {
+            Ok(_) => println!("Package installed"),
+            Err(e) => println!("Error: {}", e),
+        },
+        _ => println!("Invalid input or package out of range"),
     }
 }
 
@@ -139,7 +134,7 @@ pub async fn handle_update() {
 }
 
 pub async fn handle_cache_delete() {
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
     let cache_path = std::path::Path::new(&cache_path);
 
     // delete every folder in the cache_path

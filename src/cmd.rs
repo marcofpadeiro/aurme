@@ -3,8 +3,8 @@ use crate::commands;
 use crate::errors;
 
 pub struct Config {
-    pub arg: String,
-    pub values: Vec<String>,
+    arg: String,
+    values: Vec<String>,
 }
 
 impl Config {

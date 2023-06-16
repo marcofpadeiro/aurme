@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
+pub const CACHE_PATH: &str = ".cache/aur";
 
 /**
 * helper function to fetch the html of a page
@@ -46,7 +47,7 @@ pub fn get_git_url(package_name: &str) -> String {
 * @param package_name: the name of the package
 */
 pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
     let package_path: String = format!("{}/{}", cache_path, package_name);
 
     check_dependency("git");
@@ -104,13 +105,18 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
             let version = package_parts.next().unwrap_or("").to_owned();
             let description = name.clone();
 
-            Package::new(name, description, version)
+            Package::new(name, description, Some(version))
         })
         .collect();
 
     Ok(installed_packages)
 }
 
+/**
+* Function feed into the thread pool to check for updates for a package
+* @param package: the package to check for updates
+* @return: a tuple of the package and the version of the latest update or an error message
+*/
 pub async fn check_for_package_updates(package: Package) -> Result<(Package, String), String> {
     let url = format!(
         "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
@@ -173,13 +179,15 @@ pub async fn check_for_updates_threads(
     Ok(results)
 }
 
+/**
+* Checks if a dependency is installed in the system
+*/
 pub fn check_dependency(dependency_name: &str) {
     let dependency_check = Command::new("pacman")
         .arg("-Q")
         .output()
         .expect("Failed to get installed packages");
 
-    // convert to string
     let output = String::from_utf8_lossy(&dependency_check.stdout);
 
     if !output.contains(dependency_name) {
@@ -200,32 +208,29 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
     let url = format!("{}/packages/?K={}", AUR_URL, package_name);
     let res = fetch(&url).await.unwrap();
 
-    let names: Vec<String> = Document::from(res.as_str())
+    // find all a tags with packages href
+    Document::from(res.as_str())
         .find(select::predicate::Name("tr"))
         .flat_map(|n| n.find(select::predicate::Name("td")))
         .flat_map(|n| n.find(select::predicate::Name("a")))
         .filter(|n| n.attr("href").unwrap_or("").contains("/packages"))
         .take(10)
         .map(|n| n.text().trim().to_string())
-        .collect();
-
-    let descriptions: Vec<String> = Document::from(res.as_str())
-        .find(select::predicate::Name("tr"))
-        .flat_map(|n| n.find(select::predicate::Name("td")))
-        .filter(|n| n.attr("class").unwrap_or("") == "wrap")
-        .take(10)
-        .map(|n| n.text().trim().to_string())
-        .collect();
-
-    let packages: Vec<Package> = names
+        .collect::<Vec<String>>()
         .iter()
-        .zip(descriptions.iter())
-        .map(|(name, description)| {
-            Package::new(name.to_string(), description.to_string(), "1".to_string())
-        })
-        .collect();
-
-    packages
+        .zip(
+            // zip with the package description
+            Document::from(res.as_str())
+                .find(select::predicate::Name("tr"))
+                .flat_map(|n| n.find(select::predicate::Name("td")))
+                .filter(|n| n.attr("class").unwrap_or("") == "wrap")
+                .take(10)
+                .map(|n| n.text().trim().to_string())
+                .collect::<Vec<String>>()
+                .iter(),
+        )
+        .map(|(name, description)| Package::new(name.to_string(), description.to_string(), None))
+        .collect()
 }
 
 /**
@@ -237,7 +242,7 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let package_path: String = format!(
         "{}/{}/{}",
         home::home_dir().unwrap().display(),
-        ".cache/aur",
+        CACHE_PATH,
         package_name
     );
 
