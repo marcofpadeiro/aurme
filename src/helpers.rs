@@ -268,3 +268,14 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 }
+
+pub fn remove_package_from_cache(package_name: &str) {
+    let package_path: String = format!(
+        "{}/{}/{}",
+        home::home_dir().unwrap().display(),
+        ".cache/aur",
+        package_name
+    );
+
+    std::fs::remove_dir_all(package_path).unwrap();
+}

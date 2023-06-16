@@ -32,7 +32,10 @@ pub async fn handle_install(values: Vec<String>) {
         .iter()
         .for_each(|package| match clone_package(&package) {
             Ok(_) => println!("Package installed"),
-            Err(e) => println!("Error: {}", e),
+            Err(e) => {
+                println!("Error: {}", e);
+                helpers::remove_package_from_cache(&package);
+            }
         });
 }
 
@@ -158,15 +161,17 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
     if packages.len() > 0 {
         let mut packages_delete_successfully: Vec<String> = Vec::new();
         let mut packages_didnt_exist: Vec<String> = Vec::new();
+
         for package in packages {
             let package_path = cache_path.join(&package);
             if package_path.exists() {
-                std::fs::remove_dir_all(package_path).unwrap();
+                helpers::remove_package_from_cache(&package);
                 packages_delete_successfully.push(package);
             } else {
                 packages_didnt_exist.push(package);
             }
         }
+
         if packages_delete_successfully.len() > 0 {
             println!(
                 "Successfully deleted packages in cache ({})",
@@ -189,8 +194,8 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
     }
     // delete every folder in the cache_path
     std::fs::read_dir(cache_path).unwrap().for_each(|entry| {
-        let entry = entry.unwrap();
-        let path = entry.path();
+        let entry_a = entry.unwrap();
+        let path = entry_a.path();
         if path.is_dir() {
             std::fs::remove_dir_all(path).unwrap();
         } else {
