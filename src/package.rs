@@ -3,7 +3,7 @@ use crate::helpers::makepkg;
 use crate::helpers::CACHE_PATH;
 use std::process::Command;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Package {
     name: String,
     version: String,
@@ -11,10 +11,13 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn new(name: String, description: String, version: Option<String>) -> Package {
+    pub fn new(name: String, description: Option<String>, version: Option<String>) -> Package {
         Package {
             name,
-            description,
+            description: match description {
+                Some(d) => d,
+                None => String::from("No description provided"),
+            },
             version: match version {
                 Some(v) => v,
                 None => String::from("1"),
