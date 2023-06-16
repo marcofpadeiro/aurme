@@ -113,20 +113,12 @@ pub async fn handle_search(query: String) {
 
 pub async fn handle_update() {
     println!("Checking for updates...");
-    let installed_packages: Vec<helpers::Package> =
+    let packages_need_updates: Vec<helpers::Package> =
         helpers::get_installed_packages().expect("Error getting installed packages");
 
-    let mut packages_need_updates: Vec<(&helpers::Package, String)> = Vec::new(); // Use a reference to the package
-
-    for package in installed_packages.iter() {
-        let needs_update = helpers::check_for_updates(package)
-            .await
-            .expect("Error checking for updates");
-
-        if needs_update.0 {
-            packages_need_updates.push((package, needs_update.1));
-        }
-    }
+    let packages_need_updates = helpers::check_for_updates_threads(packages_need_updates)
+        .await
+        .expect("Error checking for updates");
 
     if packages_need_updates.len() == 0 {
         println!("No updates available");
@@ -135,12 +127,7 @@ pub async fn handle_update() {
 
     println!("Packages ({}) ", packages_need_updates.len());
     packages_need_updates.iter().for_each(|package| {
-        println!(
-            "   {} ({} -> {})",
-            package.0.get_name(),
-            package.0.get_version(),
-            package.1
-        );
+        println!("   {} ({})", package.get_name(), package.get_version(),);
     });
 
     print!("\nProceed with update? [Y/n]:");
@@ -157,18 +144,18 @@ pub async fn handle_update() {
     }
 
     packages_need_updates.iter().for_each(|package| {
-        if helpers::check_if_package_in_cache(package.0.get_name()) {
-            match helpers::pull_cached_package(package.0.get_name()) {
-                Ok(_) => match helpers::makepkg(package.0.get_name()) {
-                    Ok(_) => eprintln!("Successfully updated {}", package.0.get_name()),
+        if helpers::check_if_package_in_cache(package.get_name()) {
+            match helpers::pull_cached_package(package.get_name()) {
+                Ok(_) => match helpers::makepkg(package.get_name()) {
+                    Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
                     Err(e) => println!("Error: {}", e),
                 },
                 Err(e) => println!("Error: {}", e),
             }
         } else {
-            match clone_package(package.0.get_name()) {
-                Ok(_) => match helpers::makepkg(package.0.get_name()) {
-                    Ok(_) => eprintln!("Successfully updated {}", package.0.get_name()),
+            match clone_package(package.get_name()) {
+                Ok(_) => match helpers::makepkg(package.get_name()) {
+                    Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
                     Err(e) => println!("Error: {}", e),
                 },
                 Err(e) => println!("Error: {}", e),

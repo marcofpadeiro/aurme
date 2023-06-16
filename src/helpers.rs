@@ -1,10 +1,12 @@
 use reqwest;
 use serde_json::Value;
 use std::process::Command;
+use std::sync::Arc;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
 
+#[derive(Clone)]
 pub struct Package {
     name: String,
     version: String,
@@ -131,33 +133,58 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
     Ok(installed_packages)
 }
 
-pub async fn check_for_updates(
-    package: &Package,
-) -> Result<(bool, String), Box<dyn std::error::Error>> {
+pub async fn check_for_package_updates(name: &str, version: &str) -> Result<bool, String> {
     let url = format!(
         "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
-        package.get_name()
+        name
     );
 
-    let response = reqwest::get(&url).await?.text().await?;
+    let response = reqwest::get(&url).await.expect("asd").text().await;
 
-    let json: Value = serde_json::from_str(&response)?;
+    let json: Value = serde_json::from_str(&response.expect("Failed to get response")).unwrap();
 
-    let version = json
+    let new_version = json
         .get("results")
         .and_then(|results| {
             results.as_array().and_then(|results_array| {
-                results_array
-                    .iter()
-                    .find(|result| result["Name"] == package.get_name())
+                results_array.iter().find(|result| result["Name"] == name)
             })
         })
         .and_then(|result| result.get("Version"))
         .and_then(|version| version.as_str())
-        .ok_or("Invalid JSON response or version not found")?
-        .to_owned();
+        .ok_or_else(|| "Invalid JSON response or version not found".to_string())?;
 
-    Ok((package.get_version() != version, version))
+    Ok(version != new_version)
+}
+
+pub async fn check_for_updates_threads(
+    packages: Vec<Package>,
+) -> Result<Vec<Package>, Box<dyn std::error::Error>> {
+    let packages = Arc::new(packages); // Wrap the vector in an Arc
+
+    let mut tasks = Vec::new();
+
+    for number in 0..packages.len() {
+        let packages_clone = Arc::clone(&packages); // Create a clone of Arc for each task
+        let task = tokio::spawn(async move {
+            let package_name = packages_clone[number].get_name().clone();
+            let package_version = packages_clone[number].get_version().clone();
+            let result = check_for_package_updates(package_name, package_version).await;
+            (number, result.expect("Failed to get result"))
+        });
+        tasks.push(task);
+    }
+
+    let mut results: Vec<Package> = Vec::new();
+
+    for task in tasks {
+        let (number, result) = task.await?;
+        if result == true {
+            results.push(packages[number].clone());
+        }
+    }
+
+    Ok(results)
 }
 
 pub fn check_if_package_in_cache(package_name: &str) -> bool {
