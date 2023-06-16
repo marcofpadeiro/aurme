@@ -2,7 +2,6 @@ use crate::errors;
 use crate::helpers;
 use crate::helpers::check_package_existance;
 use crate::helpers::clone_package;
-use crate::package;
 use std::io::{self, Write};
 
 // Purpose: Handle the commands passed to the program.
@@ -84,12 +83,26 @@ pub async fn handle_search(query: String) {
     }
 }
 
-pub async fn handle_update() {
+pub async fn handle_update(values: Vec<String>) {
     println!("Checking for updates...");
-    let packages_need_updates: Vec<package::Package> =
-        helpers::get_installed_packages().expect("Error getting installed packages");
 
-    let packages_need_updates = helpers::check_for_updates_threads(packages_need_updates)
+    let packages_look_for_updates = if values.len() > 0 {
+        match helpers::check_if_packages_installed(values) {
+            Ok(packages) => packages,
+            Err(packages_missing) => {
+                println!("The following packages are not installed:");
+                for package in packages_missing.iter() {
+                    println!("  {}", package);
+                }
+                println!("Aborting...");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        helpers::get_installed_packages().expect("Error getting installed packages")
+    };
+
+    let packages_need_updates = helpers::check_for_updates_threads(packages_look_for_updates)
         .await
         .expect("Error checking for updates");
 
