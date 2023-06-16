@@ -133,10 +133,10 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
     Ok(installed_packages)
 }
 
-pub async fn check_for_package_updates(name: &str, version: &str) -> Result<bool, String> {
+pub async fn check_for_package_updates(package: Package) -> Result<(Package, String), String> {
     let url = format!(
         "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
-        name
+        package.get_name()
     );
 
     let response = reqwest::get(&url).await.expect("asd").text().await;
@@ -147,40 +147,48 @@ pub async fn check_for_package_updates(name: &str, version: &str) -> Result<bool
         .get("results")
         .and_then(|results| {
             results.as_array().and_then(|results_array| {
-                results_array.iter().find(|result| result["Name"] == name)
+                results_array
+                    .iter()
+                    .find(|result| result["Name"] == package.get_name())
             })
         })
         .and_then(|result| result.get("Version"))
         .and_then(|version| version.as_str())
         .ok_or_else(|| "Invalid JSON response or version not found".to_string())?;
 
-    Ok(version != new_version)
+    if package.get_version() != new_version.to_string() {
+        return Ok((package, new_version.to_string()));
+    }
+    Err("No update available".to_string())
 }
 
 pub async fn check_for_updates_threads(
     packages: Vec<Package>,
-) -> Result<Vec<Package>, Box<dyn std::error::Error>> {
-    let packages = Arc::new(packages); // Wrap the vector in an Arc
+) -> Result<Vec<(Package, String)>, Box<dyn std::error::Error>> {
+    let packages = Arc::new(packages);
 
     let mut tasks = Vec::new();
 
-    for number in 0..packages.len() {
-        let packages_clone = Arc::clone(&packages); // Create a clone of Arc for each task
+    for package in packages.iter() {
+        let package_clone = package.clone();
         let task = tokio::spawn(async move {
-            let package_name = packages_clone[number].get_name().clone();
-            let package_version = packages_clone[number].get_version().clone();
-            let result = check_for_package_updates(package_name, package_version).await;
-            (number, result.expect("Failed to get result"))
+            let result = check_for_package_updates(package_clone).await;
+            match result {
+                Ok(result) => Ok(result),
+                Err(e) => Err(e),
+            }
         });
+
         tasks.push(task);
     }
 
-    let mut results: Vec<Package> = Vec::new();
+    let mut results: Vec<(Package, String)> = Vec::new();
 
     for task in tasks {
-        let (number, result) = task.await?;
-        if result == true {
-            results.push(packages[number].clone());
+        let result = task.await?;
+        match result {
+            Ok(result) => results.push(result),
+            Err(_) => continue,
         }
     }
 

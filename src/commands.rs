@@ -127,7 +127,14 @@ pub async fn handle_update() {
 
     println!("Packages ({}) ", packages_need_updates.len());
     packages_need_updates.iter().for_each(|package| {
-        println!("   {} ({})", package.get_name(), package.get_version(),);
+        let version = &package.1;
+        let package = &package.0;
+        println!(
+            "   {} ({} -> {})",
+            package.get_name(),
+            package.get_version(),
+            version
+        );
     });
 
     print!("\nProceed with update? [Y/n]:");
@@ -144,6 +151,7 @@ pub async fn handle_update() {
     }
 
     packages_need_updates.iter().for_each(|package| {
+        let package = &package.0;
         if helpers::check_if_package_in_cache(package.get_name()) {
             match helpers::pull_cached_package(package.get_name()) {
                 Ok(_) => match helpers::makepkg(package.get_name()) {
