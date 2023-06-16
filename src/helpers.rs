@@ -103,9 +103,8 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
             let mut package_parts = package_line.split_whitespace();
             let name = package_parts.next().unwrap_or("").to_owned();
             let version = package_parts.next().unwrap_or("").to_owned();
-            let description = name.clone();
 
-            Package::new(name, description, Some(version))
+            Package::new(name, None, Some(version))
         })
         .collect();
 
@@ -229,7 +228,9 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
                 .collect::<Vec<String>>()
                 .iter(),
         )
-        .map(|(name, description)| Package::new(name.to_string(), description.to_string(), None))
+        .map(|(name, description)| {
+            Package::new(name.to_string(), Some(description.to_string()), None)
+        })
         .collect()
 }
 
