@@ -131,10 +131,7 @@ pub async fn handle_update() {
                 }
             } else {
                 match clone_package(package.get_name()) {
-                    Ok(_) => match helpers::makepkg(package.get_name()) {
-                        Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
-                        Err(e) => println!("Error: {}", e),
-                    },
+                    Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
                     Err(e) => println!("Error: {}", e),
                 }
             }
