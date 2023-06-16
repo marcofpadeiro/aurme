@@ -22,26 +22,26 @@ impl Config {
 
         return Ok(Config { arg, values });
     }
-}
 
-pub async fn handle_args(config: Config) {
-    match config.arg.as_str() {
-        "-S" => {
-            if config.values.len() == 0 {
-                errors::handle_error("no packages specified");
-            } else {
-                commands::handle_install(config.values).await;
+    pub async fn handle_args(&self) {
+        match self.arg.as_str() {
+            "-S" => {
+                if self.values.len() == 0 {
+                    errors::handle_error("no packages specified");
+                } else {
+                    commands::handle_install(self.values.clone()).await;
+                }
             }
-        }
-        "-Ss" => {
-            if config.values.len() == 0 {
-                errors::handle_error("no packages specified");
-            } else {
-                commands::handle_search(config.values[0].clone()).await;
+            "-Ss" => {
+                if self.values.len() == 0 {
+                    errors::handle_error("no packages specified");
+                } else {
+                    commands::handle_search(self.values[0].clone()).await;
+                }
             }
+            "-Syu" => commands::handle_update().await,
+            "-Sc" => commands::handle_cache_delete().await,
+            _ => errors::handle_error(self.arg.as_str()),
         }
-        "-Syu" => commands::handle_update().await,
-        "-Sc" => commands::handle_cache_delete().await,
-        _ => errors::handle_error(config.arg.as_str()),
     }
 }
