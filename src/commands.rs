@@ -151,10 +151,42 @@ pub async fn handle_update(values: Vec<String>) {
         });
 }
 
-pub async fn handle_cache_delete() {
+pub async fn handle_cache_delete(packages: Vec<String>) {
     let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
     let cache_path = std::path::Path::new(&cache_path);
 
+    if packages.len() > 0 {
+        let mut packages_delete_successfully: Vec<String> = Vec::new();
+        let mut packages_didnt_exist: Vec<String> = Vec::new();
+        for package in packages {
+            let package_path = cache_path.join(&package);
+            if package_path.exists() {
+                std::fs::remove_dir_all(package_path).unwrap();
+                packages_delete_successfully.push(package);
+            } else {
+                packages_didnt_exist.push(package);
+            }
+        }
+        if packages_delete_successfully.len() > 0 {
+            println!(
+                "Successfully deleted packages in cache ({})",
+                packages_delete_successfully.len()
+            );
+            for package in packages_delete_successfully.iter() {
+                println!("  {}", package);
+            }
+        }
+        if packages_didnt_exist.len() > 0 {
+            println!(
+                "Error: Couldn't delete these packages because weren't in the cache ({})",
+                packages_didnt_exist.len()
+            );
+            for package in packages_didnt_exist.iter() {
+                println!("  {}", package);
+            }
+        }
+        return;
+    }
     // delete every folder in the cache_path
     std::fs::read_dir(cache_path).unwrap().for_each(|entry| {
         let entry = entry.unwrap();

@@ -42,7 +42,7 @@ impl Config {
             "-Syu" => {
                 commands::handle_update(self.values.clone()).await;
             }
-            "-Sc" => commands::handle_cache_delete().await,
+            "-Sc" => commands::handle_cache_delete(self.values.clone()).await,
             _ => errors::handle_error(self.arg.as_str()),
         }
     }
