@@ -1,7 +1,9 @@
 use crate::package::Package;
 use reqwest;
 use select::document::Document;
+use serde_json::Value;
 use std::process::Command;
+use std::sync::Arc;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
@@ -102,17 +104,75 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
             let version = package_parts.next().unwrap_or("").to_owned();
             let description = name.clone();
 
-            Package::new(name, version, description)
+            Package::new(name, description, version)
         })
         .collect();
 
     Ok(installed_packages)
 }
 
-/**
-* checks if a dependency is installed on the system
-* @param dependency_name: the name of the dependency to check
-*/
+pub async fn check_for_package_updates(package: Package) -> Result<(Package, String), String> {
+    let url = format!(
+        "https://aur.archlinux.org/rpc/?v=5&type=search&arg={}",
+        package.get_name()
+    );
+
+    let response = reqwest::get(&url).await.expect("asd").text().await;
+
+    let json: Value = serde_json::from_str(&response.expect("Failed to get response")).unwrap();
+
+    let new_version = json
+        .get("results")
+        .and_then(|results| {
+            results.as_array().and_then(|results_array| {
+                results_array
+                    .iter()
+                    .find(|result| result["Name"] == package.get_name())
+            })
+        })
+        .and_then(|result| result.get("Version"))
+        .and_then(|version| version.as_str())
+        .ok_or_else(|| "Invalid JSON response or version not found".to_string())?;
+
+    if package.get_version() != new_version.to_string() {
+        return Ok((package, new_version.to_string()));
+    }
+    Err("No update available".to_string())
+}
+
+pub async fn check_for_updates_threads(
+    packages: Vec<Package>,
+) -> Result<Vec<(Package, String)>, Box<dyn std::error::Error>> {
+    let packages = Arc::new(packages);
+
+    let mut tasks = Vec::new();
+
+    for package in packages.iter() {
+        let package_clone = package.clone();
+        let task = tokio::spawn(async move {
+            let result = check_for_package_updates(package_clone).await;
+            match result {
+                Ok(result) => Ok(result),
+                Err(e) => Err(e),
+            }
+        });
+
+        tasks.push(task);
+    }
+
+    let mut results: Vec<(Package, String)> = Vec::new();
+
+    for task in tasks {
+        let result = task.await?;
+        match result {
+            Ok(result) => results.push(result),
+            Err(_) => continue,
+        }
+    }
+
+    Ok(results)
+}
+
 pub fn check_dependency(dependency_name: &str) {
     let dependency_check = Command::new("pacman")
         .arg("-Q")
@@ -144,6 +204,7 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
         .find(select::predicate::Name("tr"))
         .flat_map(|n| n.find(select::predicate::Name("td")))
         .flat_map(|n| n.find(select::predicate::Name("a")))
+        .filter(|n| n.attr("href").unwrap_or("").contains("/packages"))
         .take(10)
         .map(|n| n.text().trim().to_string())
         .collect();

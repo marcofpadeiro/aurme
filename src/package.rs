@@ -1,7 +1,5 @@
 use crate::helpers::check_dependency;
-use crate::helpers::fetch;
 use crate::helpers::makepkg;
-use crate::helpers::AUR_URL;
 use std::process::Command;
 
 #[derive(Debug, Default, Clone)]
@@ -30,26 +28,6 @@ impl Package {
 
     pub fn get_version(&self) -> &str {
         &self.version
-    }
-
-    pub async fn check_for_updates(&self) -> Result<(bool, String), Box<dyn std::error::Error>> {
-        let url = format!("{}/packages/{}", AUR_URL, &self.name);
-        let res = fetch(&url).await.unwrap();
-
-        let re = regex::Regex::new(r"<h2>Package Details: [^<]+ (.+)</h2>").unwrap();
-
-        if let Some(captures) = re.captures(&res) {
-            if let Some(version) = captures.get(1) {
-                Ok((
-                    version.as_str() != &self.version,
-                    version.as_str().to_owned(),
-                ))
-            } else {
-                Err("No version found".into())
-            }
-        } else {
-            Err("Couldn't get most recent version".into())
-        }
     }
 
     pub fn check_if_package_in_cache(&self) -> bool {

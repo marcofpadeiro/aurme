@@ -86,21 +86,12 @@ pub async fn handle_search(query: String) {
 
 pub async fn handle_update() {
     println!("Checking for updates...");
-    let installed_packages: Vec<package::Package> =
+    let packages_need_updates: Vec<package::Package> =
         helpers::get_installed_packages().expect("Error getting installed packages");
 
-    let mut packages_need_updates: Vec<(&package::Package, String)> = Vec::new(); // Use a reference to the package
-
-    for package in installed_packages.iter() {
-        let (needs_update, version) = package
-            .check_for_updates()
-            .await
-            .expect("Error checking for updates");
-
-        if needs_update {
-            packages_need_updates.push((package, version));
-        }
-    }
+    let packages_need_updates = helpers::check_for_updates_threads(packages_need_updates)
+        .await
+        .expect("Error checking for updates");
 
     if packages_need_updates.len() == 0 {
         println!("No updates available");
@@ -130,19 +121,24 @@ pub async fn handle_update() {
         return;
     }
 
-    packages_need_updates.iter().for_each(|(package, _)| {
-        if package.check_if_package_in_cache() {
-            match package.pull_cached_package() {
-                Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
-                Err(e) => println!("Error: {}", e),
+    packages_need_updates
+        .iter()
+        .for_each(|(package, _version)| {
+            if package.check_if_package_in_cache() {
+                match package.pull_cached_package() {
+                    Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
+                    Err(e) => println!("Error: {}", e),
+                }
+            } else {
+                match clone_package(package.get_name()) {
+                    Ok(_) => match helpers::makepkg(package.get_name()) {
+                        Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
+                        Err(e) => println!("Error: {}", e),
+                    },
+                    Err(e) => println!("Error: {}", e),
+                }
             }
-        } else {
-            match clone_package(package.get_name()) {
-                Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
-                Err(e) => println!("Error: {}", e),
-            }
-        }
-    });
+        });
 }
 
 pub async fn handle_cache_delete() {
