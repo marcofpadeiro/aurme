@@ -4,6 +4,7 @@ mod cmd;
 mod commands;
 mod errors;
 mod helpers;
+mod package;
 
 #[tokio::main]
 async fn main() {
@@ -18,5 +19,5 @@ async fn main() {
 }
 
 async fn run(config: cmd::Config) {
-    cmd::handle_args(config).await;
+    config.handle_args().await;
 }

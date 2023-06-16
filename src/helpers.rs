@@ -1,40 +1,15 @@
+use crate::package::Package;
 use reqwest;
+use select::document::Document;
 use std::process::Command;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
 
-pub struct Package {
-    name: String,
-    version: String,
-    description: String,
-}
-
-impl Package {
-    pub fn new(name: String, description: String, version: String) -> Package {
-        Package {
-            name,
-            description,
-            version,
-        }
-    }
-
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn get_description(&self) -> &str {
-        &self.description
-    }
-
-    pub fn get_version(&self) -> &str {
-        &self.version
-    }
-}
-
 /**
 * helper function to fetch the html of a page
 * @param url: the url of the page
+* @return the html of the page
 */
 pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let res = reqwest::get(url).await?.text().await?;
@@ -44,8 +19,11 @@ pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 /**
 * helper function to check if package exists
 * @param package_name: the name of the package
+* @return true if the package exists, false otherwise
 */
-pub async fn check_package(package_name: &str) -> Result<bool, Box<dyn std::error::Error>> {
+pub async fn check_package_existance(
+    package_name: &str,
+) -> Result<bool, Box<dyn std::error::Error>> {
     let url = format!("{}/packages/{}", AUR_URL, package_name);
     let res = fetch(&url).await.unwrap();
 
@@ -55,6 +33,7 @@ pub async fn check_package(package_name: &str) -> Result<bool, Box<dyn std::erro
 /**
 * helper function to get the git link of a package
 * @param package_name: the name of the package
+* @return the git link of the package
 */
 pub fn get_git_url(package_name: &str) -> String {
     format!("{}/{}.git", AUR_URL, package_name.to_lowercase())
@@ -98,6 +77,10 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
     }
 }
 
+/**
+* Checks system for installed packages
+* @return: a vector of installed packages
+**/
 pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Error>> {
     let installed_packages_output = Command::new("pacman")
         .arg("-Qm")
@@ -119,72 +102,17 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
             let version = package_parts.next().unwrap_or("").to_owned();
             let description = name.clone();
 
-            Package {
-                name,
-                description,
-                version,
-            }
+            Package::new(name, version, description)
         })
         .collect();
 
     Ok(installed_packages)
 }
 
-pub async fn check_for_updates(
-    package: &Package,
-) -> Result<(bool, String), Box<dyn std::error::Error>> {
-    let url = format!("{}/packages/{}", AUR_URL, package.get_name());
-    let res = fetch(&url).await.unwrap();
-
-    let re = regex::Regex::new(r"<h2>Package Details: [^<]+ (.+)</h2>").unwrap();
-
-    if let Some(captures) = re.captures(&res) {
-        if let Some(version) = captures.get(1) {
-            Ok((
-                version.as_str() != package.get_version(),
-                version.as_str().to_owned(),
-            ))
-        } else {
-            Err("No version found".into())
-        }
-    } else {
-        Err("Couldn't get most recent version".into())
-    }
-}
-
-pub fn check_if_package_in_cache(package_name: &str) -> bool {
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
-    let package_path: String = format!("{}/{}", cache_path, package_name);
-
-    std::path::Path::new(package_path.as_str()).exists()
-}
-
-pub fn pull_cached_package(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let package_path: String = format!(
-        "{}/{}/{}",
-        home::home_dir().unwrap().display(),
-        ".cache/aur",
-        package_name
-    );
-
-    check_dependency("git");
-
-    // cd into package, pull changes
-    let exit_status = Command::new("git")
-        .arg("pull")
-        .arg("origin")
-        .arg("master")
-        .current_dir(package_path)
-        .output()
-        .unwrap();
-
-    if exit_status.status.code().unwrap() != 0 {
-        Err(String::from_utf8_lossy(&exit_status.stderr).into())
-    } else {
-        Ok(())
-    }
-}
-
+/**
+* checks if a dependency is installed on the system
+* @param dependency_name: the name of the dependency to check
+*/
 pub fn check_dependency(dependency_name: &str) {
     let dependency_check = Command::new("pacman")
         .arg("-Q")
@@ -203,6 +131,46 @@ pub fn check_dependency(dependency_name: &str) {
     }
 }
 
+/**
+* Scrapes AUR page for top 10 packages
+* @param package_name: the package name to search for
+* @return a vector of the top 10 packages
+*/
+pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
+    let url = format!("{}/packages/?K={}", AUR_URL, package_name);
+    let res = fetch(&url).await.unwrap();
+
+    let names: Vec<String> = Document::from(res.as_str())
+        .find(select::predicate::Name("tr"))
+        .flat_map(|n| n.find(select::predicate::Name("td")))
+        .flat_map(|n| n.find(select::predicate::Name("a")))
+        .take(10)
+        .map(|n| n.text().trim().to_string())
+        .collect();
+
+    let descriptions: Vec<String> = Document::from(res.as_str())
+        .find(select::predicate::Name("tr"))
+        .flat_map(|n| n.find(select::predicate::Name("td")))
+        .filter(|n| n.attr("class").unwrap_or("") == "wrap")
+        .take(10)
+        .map(|n| n.text().trim().to_string())
+        .collect();
+
+    let packages: Vec<Package> = names
+        .iter()
+        .zip(descriptions.iter())
+        .map(|(name, description)| {
+            Package::new(name.to_string(), description.to_string(), "1".to_string())
+        })
+        .collect();
+
+    packages
+}
+
+/**
+* Runs makepkg command to build a package
+* @param package_name: the name of the package to build
+*/
 pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Building {}...", package_name);
     let package_path: String = format!(
