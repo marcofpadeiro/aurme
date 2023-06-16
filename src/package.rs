@@ -1,9 +1,10 @@
 use crate::helpers::check_dependency;
 use crate::helpers::makepkg;
+use crate::helpers::CACHE_PATH;
 use serde_json::Value;
 use std::process::Command;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Package {
     name: String,
     version: String,
@@ -11,11 +12,17 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn new(name: String, description: String, version: String) -> Package {
+    pub fn new(name: String, description: Option<String>, version: Option<String>) -> Package {
         Package {
             name,
-            description,
-            version,
+            description: match description {
+                Some(d) => d,
+                None => String::from("No description provided"),
+            },
+            version: match version {
+                Some(v) => v,
+                None => String::from("1"),
+            },
         }
     }
 
@@ -31,19 +38,28 @@ impl Package {
         &self.version
     }
 
+    /**
+     * Check if package is in cache
+     */
     pub fn check_if_package_in_cache(&self) -> bool {
-        let cache_path: String =
-            format!("{}/{}", home::home_dir().unwrap().display(), ".cache/aur");
-        let package_path: String = format!("{}/{}", cache_path, &self.name);
+        let package_path: String = format!(
+            "{}/{}/{}",
+            home::home_dir().unwrap().display(),
+            CACHE_PATH,
+            &self.name
+        );
 
         std::path::Path::new(package_path.as_str()).exists()
     }
 
+    /**
+     * if package is in cache, pull changes and updates
+     */
     pub fn pull_cached_package(&self) -> Result<(), Box<dyn std::error::Error>> {
         let package_path: String = format!(
             "{}/{}/{}",
             home::home_dir().unwrap().display(),
-            ".cache/aur",
+            CACHE_PATH,
             &self.name
         );
 
