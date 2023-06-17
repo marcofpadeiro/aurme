@@ -24,11 +24,11 @@ impl Config {
     }
 
     pub async fn handle_args(&self) {
-        match self.arg.as_str() {
-            "-S" => commands::handle_install(self.values.clone()).await,
-            "-Ss" => commands::handle_search(self.values[0].clone()).await,
-            "-Syyu" | "-Syu" | "-Sy" | "-Suy" => commands::handle_update(self.values.clone()).await,
-            "-Sc" => commands::handle_cache_delete(self.values.clone()).await,
+        match (self.arg.as_str(), self.values.as_slice()) {
+            ("-S", values) => commands::handle_install(values.to_vec()).await,
+            ("-Ss", [query]) => commands::handle_search(query.clone()).await,
+            ("-Syu" | "-Suy", values) => commands::handle_update(values.to_vec()).await,
+            ("-Sc", values) => commands::handle_cache_delete(values.to_vec()).await,
             _ => errors::handle_error(self.arg.as_str()),
         }
     }

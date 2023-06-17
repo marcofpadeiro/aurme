@@ -63,16 +63,16 @@ pub async fn handle_search(query: String) {
     }
 
     // print packages
-    packages.iter().enumerate().for_each(|(i, package)| {
+    packages.iter().rev().enumerate().for_each(|(i, package)| {
         println!(
             "\n{}: {}\n  {}",
-            i + 1,
+            packages.len() - i,
             package.get_name(),
             package.get_description()
         );
     });
 
-    print!("Install package(s) (1-10) or (q)uit: ");
+    print!("\nInstall package(s) (1-10) or (q)uit: ");
     io::stdout().flush().unwrap();
 
     let mut input = String::new();
