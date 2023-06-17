@@ -12,8 +12,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "aur"
-version = "0.1.0"
+name = "aurme"
+version = "1.0.0"
 dependencies = [
  "home",
  "regex",
