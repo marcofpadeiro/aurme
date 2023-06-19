@@ -6,6 +6,8 @@ use crate::helpers;
 use crate::helpers::check_package_existance;
 use crate::helpers::clone_package;
 use crate::helpers::CACHE_PATH;
+use crate::theme::colorize;
+use crate::theme::Type;
 use std::io::{self, Write};
 
 /**
@@ -14,7 +16,7 @@ use std::io::{self, Write};
 */
 pub async fn handle_install(values: Vec<String>) {
     if values.len() == 0 {
-        errors::handle_error("no packages specified");
+        errors::handle_error("No packages specified");
     }
 
     let mut non_existent_packages: Vec<&str> = Vec::new();
@@ -28,9 +30,12 @@ pub async fn handle_install(values: Vec<String>) {
     }
 
     if non_existent_packages.len() > 0 {
-        println!("The following packages do not exist in the AUR:");
+        println!(
+            "{} The following packages do not exist in the AUR:",
+            colorize(Type::Error, "Error:")
+        );
         for package in non_existent_packages.iter() {
-            println!("{}", package);
+            println!("  {}", package);
         }
         return;
     }
@@ -38,9 +43,9 @@ pub async fn handle_install(values: Vec<String>) {
     values
         .iter()
         .for_each(|package| match clone_package(&package) {
-            Ok(_) => println!("Package installed"),
+            Ok(_) => println!("{}", colorize(Type::Info, "Package installed")),
             Err(e) => {
-                println!("Error: {}", e);
+                println!("{} {}", colorize(Type::Error, "Error:"), e);
                 helpers::remove_package_from_cache(&package);
             }
         });
@@ -57,7 +62,8 @@ pub async fn handle_search(query: String) {
 
     let packages = helpers::get_top_packages(&query).await;
 
-    if packages.len() == 0 {
+    let len = packages.len();
+    if len == 0 {
         println!("No packages found");
         return;
     }
@@ -65,9 +71,9 @@ pub async fn handle_search(query: String) {
     // print packages
     packages.iter().rev().enumerate().for_each(|(i, package)| {
         println!(
-            "\n{}: {}\n  {}",
-            packages.len() - i,
-            package.get_name(),
+            "\n{} {}\n  {}",
+            colorize(Type::Info, format!("{} ┃", len - i).as_str()),
+            colorize(Type::Header, package.get_name()),
             package.get_description()
         );
     });
@@ -88,10 +94,13 @@ pub async fn handle_search(query: String) {
 
     match parsed_input {
         Ok(i) if i > 0 && i <= packages.len() => match clone_package(packages[i - 1].get_name()) {
-            Ok(_) => println!("Package installed"),
-            Err(e) => println!("Error: {}", e),
+            Ok(_) => println!("   {}\n", colorize(Type::Success, "Package installed")),
+            Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
         },
-        _ => println!("Invalid input or package out of range"),
+        _ => println!(
+            "{}",
+            colorize(Type::Warning, "Invalid input or package out of range")
+        ),
     }
 }
 
@@ -100,7 +109,7 @@ pub async fn handle_search(query: String) {
 * @param values: A vector of strings containing the packages to update
 */
 pub async fn handle_update(values: Vec<String>) {
-    println!("Checking for updates...");
+    println!("{} for updates...", colorize(Type::Info, "Checking"));
 
     let packages_look_for_updates = if values.len() > 0 {
         match helpers::check_if_packages_installed(values) {
@@ -110,7 +119,7 @@ pub async fn handle_update(values: Vec<String>) {
                 for package in packages_missing.iter() {
                     println!("  {}", package);
                 }
-                println!("Aborting...");
+                println!("{}", colorize(Type::Warning, "Aborting..."));
                 std::process::exit(1);
             }
         }
@@ -127,13 +136,19 @@ pub async fn handle_update(values: Vec<String>) {
         return;
     }
 
-    println!("Packages ({}) ", packages_need_updates.len());
+    println!(
+        "{}",
+        colorize(
+            Type::Header,
+            format!("Packages ({}) ", packages_need_updates.len()).as_str()
+        )
+    );
     packages_need_updates.iter().for_each(|(package, version)| {
         println!(
             "   {} ({} -> {})",
             package.get_name(),
-            package.get_version(),
-            version
+            colorize(Type::Error, package.get_version()),
+            colorize(Type::Success, version),
         );
     });
 
@@ -146,7 +161,7 @@ pub async fn handle_update(values: Vec<String>) {
     let input = input.trim();
 
     if input != "" && input != "y" && input != "Y" {
-        println!("Aborting...");
+        println!("{}", colorize(Type::Warning, "Aborting..."));
         return;
     }
 
@@ -155,13 +170,21 @@ pub async fn handle_update(values: Vec<String>) {
         .for_each(|(package, _version)| {
             if package.check_if_package_in_cache() {
                 match package.pull_cached_package() {
-                    Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
-                    Err(e) => println!("Error: {}", e),
+                    Ok(_) => eprintln!(
+                        "{} updated {}",
+                        colorize(Type::Success, "Successfully"),
+                        package.get_name()
+                    ),
+                    Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
                 }
             } else {
                 match clone_package(package.get_name()) {
-                    Ok(_) => eprintln!("Successfully updated {}", package.get_name()),
-                    Err(e) => println!("Error: {}", e),
+                    Ok(_) => eprintln!(
+                        "{} updated {}",
+                        colorize(Type::Success, "Successfully"),
+                        package.get_name()
+                    ),
+                    Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
                 }
             }
         });
@@ -191,7 +214,8 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
 
         if packages_delete_successfully.len() > 0 {
             println!(
-                "Successfully deleted packages in cache ({})",
+                "{} deleted packages in cache ({})",
+                colorize(Type::Success, "Successfully"),
                 packages_delete_successfully.len()
             );
             for package in packages_delete_successfully.iter() {
@@ -200,7 +224,8 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
         }
         if packages_didnt_exist.len() > 0 {
             println!(
-                "Error: Couldn't delete these packages because weren't in the cache ({})",
+                "{} Couldn't delete these packages because weren't in the cache ({})",
+                colorize(Type::Error, "Error:"),
                 packages_didnt_exist.len()
             );
             for package in packages_didnt_exist.iter() {
@@ -220,5 +245,5 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
         }
     });
 
-    println!("Successfully cleared cache");
+    println!("{} cleared cache", colorize(Type::Success, "Successfully"));
 }

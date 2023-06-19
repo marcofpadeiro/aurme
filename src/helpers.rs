@@ -1,4 +1,6 @@
 use crate::package::Package;
+use crate::theme::colorize;
+use crate::theme::Type;
 use reqwest;
 use select::document::Document;
 use std::process::Command;
@@ -71,7 +73,11 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
     if exit_status.status.code().unwrap() != 0 {
         Err(String::from_utf8_lossy(&exit_status.stderr).into())
     } else {
-        println!("Successfully cloned package: {}", package_name);
+        println!(
+            "{} cloned package {}",
+            colorize(Type::Success, "Successfully"),
+            package_name
+        );
         match makepkg(&package_name) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -251,7 +257,7 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
 * @param package_name: the name of the package to build
 */
 pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Building {}...", package_name);
+    println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
     let package_path: String = format!(
         "{}/{}/{}",
         home::home_dir().unwrap().display(),
