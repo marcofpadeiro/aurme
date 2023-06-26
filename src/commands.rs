@@ -180,7 +180,7 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
 
     if !cache_path.exists() {
         println!("Successfully cleared cache");
-        std::fs::create_dir(cache_path).unwrap();
+        std::fs::create_dir_all(cache_path).unwrap();
         return;
     }
 
