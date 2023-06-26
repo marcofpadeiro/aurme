@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub const AUR_URL: &str = "https://aur.archlinux.org";
 pub const CACHE_PATH: &str = ".cache/aurme";
 
+
 /**
 * helper function to fetch the html of a page
 * @param url: the url of the page
