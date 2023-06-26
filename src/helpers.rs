@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
-pub const CACHE_PATH: &str = ".cache/aur";
+pub const CACHE_PATH: &str = ".cache/aurme";
 
 /**
 * helper function to fetch the html of a page
@@ -274,19 +274,4 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Ok(())
     }
-}
-
-/**
-* Remove a package from the cache
-* @param package_name: the name of the package to remove
-*/
-pub fn remove_package_from_cache(package_name: &str) {
-    let package_path: String = format!(
-        "{}/{}/{}",
-        home::home_dir().unwrap().display(),
-        ".cache/aur",
-        package_name
-    );
-
-    std::fs::remove_dir_all(package_path).unwrap();
 }
