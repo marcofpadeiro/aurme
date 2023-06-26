@@ -5,6 +5,7 @@ mod commands;
 mod errors;
 mod helpers;
 mod package;
+mod theme;
 
 #[tokio::main]
 async fn main() {
