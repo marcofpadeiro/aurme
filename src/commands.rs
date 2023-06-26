@@ -35,13 +35,18 @@ pub async fn handle_install(values: Vec<String>) {
         return;
     }
 
-
     let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
     let cache_path = std::path::Path::new(&cache_path);
 
-    std::fs::remove_dir_all(cache_path.join(&package)).unwrap();
-
-
+    values
+        .iter()
+        .for_each(|package| match clone_package(&package) {
+            Ok(_) => println!("Package installed"),
+            Err(e) => {
+                println!("Error: {}", e);
+                std::fs::remove_dir_all(cache_path.join(&package)).unwrap();
+            }
+        });
 }
 
 /**
