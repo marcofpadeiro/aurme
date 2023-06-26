@@ -52,7 +52,7 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
     check_dependency("git");
 
     if !std::path::Path::new(cache_path.as_str()).exists() {
-        std::fs::create_dir(cache_path.as_str()).expect("Failed to create cache directory");
+        std::fs::create_dir_all(cache_path.as_str()).expect("Failed to create cache directory");
     }
 
     //// if dir with package name already exists, delete it
