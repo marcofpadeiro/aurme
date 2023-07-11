@@ -9,26 +9,38 @@ use crate::helpers::CACHE_PATH;
 use crate::theme::colorize;
 use crate::theme::Type;
 use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
 
-/**
-* Handle the install of packages
-* @param values: A vector of strings containing the packages to install
-*/
 pub async fn handle_install(values: Vec<String>) {
-    if values.len() == 0 {
+    if values.is_empty() {
         errors::handle_error("No packages specified");
     }
 
-    let mut non_existent_packages: Vec<&str> = Vec::new();
+    let non_existent_packages: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
-    for package in values.iter() {
-        if let Ok(exists) = check_package_existance(&package).await {
-            if !exists {
-                non_existent_packages.push(&package);
+    let values = Arc::new(values);
+
+    let mut tasks = Vec::new();
+
+    for package in values.iter().cloned() {
+        let non_existent_packages_clone = non_existent_packages.clone();
+        let task = tokio::spawn(async move {
+            if let Ok(exists) = check_package_existance(&package).await {
+                if !exists {
+                    let mut non_existent_packages = non_existent_packages_clone.lock().unwrap();
+                    non_existent_packages.push(package);
+                }
             }
-        }
+        });
+
+        tasks.push(task);
     }
 
+    for task in tasks {
+        let _ = task.await;
+    }
+
+    let non_existent_packages = non_existent_packages.lock().unwrap();
     if non_existent_packages.len() > 0 {
         println!(
             "{} The following packages do not exist in the AUR:",
