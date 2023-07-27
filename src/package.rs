@@ -1,8 +1,9 @@
 use crate::helpers::check_dependency;
 use crate::helpers::makepkg;
+use crate::helpers::AUR_URL;
 use crate::helpers::CACHE_PATH;
-use serde_json::Value;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::process::Command;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -20,7 +21,13 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn new(name: String, description: Option<String>, version: Option<String>, popularity: Option<f32>, url: Option<String>) -> Package {
+    pub fn new(
+        name: String,
+        description: Option<String>,
+        version: Option<String>,
+        popularity: Option<f32>,
+        url: Option<String>,
+    ) -> Package {
         Package {
             name,
             description: match description {
@@ -38,7 +45,7 @@ impl Package {
             url_path: match url {
                 Some(u) => u,
                 None => String::from(""),
-            }
+            },
         }
     }
 
@@ -58,8 +65,8 @@ impl Package {
         self.popularity
     }
 
-    pub fn get_url_path(&self) -> &str {
-        &self.url_path
+    pub fn get_url_path(&self) -> String {
+        AUR_URL.to_owned() + &self.url_path
     }
 
     /**
