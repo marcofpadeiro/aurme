@@ -1,16 +1,17 @@
 use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
+use flate2::read::GzDecoder;
 use reqwest;
 use serde_json::Value;
+use std::fs::File;
 use std::process::Command;
-use std::result;
 use std::sync::Arc;
+use tar::Archive;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
 pub const CACHE_PATH: &str = ".cache/aurme";
-
 
 /**
 * helper function to fetch the html of a page
@@ -29,50 +30,41 @@ pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 */
 pub async fn check_packages_existance(
     package_names: &Vec<String>,
-) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
     let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
     url = format!("{}&arg[]={}", url, package_names.join("&arg[]="));
-    
+
     let res = fetch(&url).await.unwrap();
     let json: Value = serde_json::from_str(&res).unwrap();
 
-    let non_existent_packages: Vec<String> = match json["resultcount"].as_u64() {
-        Some(result_count) if result_count < package_names.len() as u64 => {
-            let existent_packages: Vec<String> = json["results"]
-                .as_array()
-                .unwrap_or(&Vec::new())
+    let existent_packages: Vec<Package> = json["results"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|result| serde_json::from_value::<Package>(result.clone()).unwrap())
+        .collect();
+
+    // filter out the packages that don't exist
+    let non_existent = package_names
+        .iter()
+        .filter(|package_name| {
+            !existent_packages
                 .iter()
-                .map(|result| result["Name"].as_str().unwrap_or("").to_owned())
-                .collect();
+                .any(|package| package.get_name() == **package_name)
+        })
+        .map(|package_name| package_name.to_string())
+        .collect();
 
-            package_names
-                .iter()
-                .filter(|package| !existent_packages.contains(package))
-                .cloned()
-                .collect()
-        }
-        _ => Vec::new(),
-    };
-
-    Ok(non_existent_packages)
-}
-
-/**
-* helper function to get the git link of a package
-* @param package_name: the name of the package
-* @return the git link of the package
-*/
-pub fn get_git_url(package_name: &str) -> String {
-    format!("{}/{}.git", AUR_URL, package_name.to_lowercase())
+    Ok((non_existent, existent_packages))
 }
 
 /**
 * Clone a package from the AUR
 * @param package_name: the name of the package
 */
-pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn clone_package(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
     let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
-    let package_path: String = format!("{}/{}", cache_path, package_name);
+    let package_path: String = format!("{}/{}", cache_path, package.get_name());
 
     check_dependency("git");
 
@@ -86,25 +78,27 @@ pub fn clone_package(package_name: &str) -> Result<(), Box<dyn std::error::Error
     }
 
     // specify the directory to clone the package to
-    let exit_status = Command::new("git")
-        .arg("clone")
-        .arg(get_git_url(package_name))
-        .arg(package_path)
+    Command::new("curl")
+        .arg("-L")
+        .arg("-O")
+        .arg("--output-dir")
+        .arg(cache_path.clone())
+        .arg(package.get_url_path())
         .output()
         .unwrap();
 
-    if exit_status.status.code().unwrap() != 0 {
-        Err(String::from_utf8_lossy(&exit_status.stderr).into())
-    } else {
-        println!(
-            "{} cloned package {}",
-            colorize(Type::Success, "Successfully"),
-            package_name
-        );
-        match makepkg(&package_name) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
+    let file = File::open(package_path.clone() + ".tar.gz")?;
+    let mut archive = Archive::new(GzDecoder::new(file));
+    archive.unpack(cache_path.clone())?;
+
+    println!(
+        "{} cloned package {}",
+        colorize(Type::Success, "Successfully"),
+        package.get_name()
+    );
+    match makepkg(&package.get_name()) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
     }
 }
 
@@ -241,8 +235,7 @@ pub fn check_dependency(dependency_name: &str) {
     }
 }
 
-/**
-* Scrapes AUR page for top 10 packages
+/** Scrapes AUR page for top 10 packages
 * @param package_name: the package name to search for
 * @return a vector of the top 10 packages
 */

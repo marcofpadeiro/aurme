@@ -6,6 +6,7 @@ use crate::helpers;
 use crate::helpers::check_packages_existance;
 use crate::helpers::clone_package;
 use crate::helpers::CACHE_PATH;
+use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
 use std::io::{self, Write};
@@ -19,13 +20,17 @@ pub async fn handle_install(values: Vec<String>) {
         errors::handle_error("No packages specified");
     }
 
+    let existent_packages: Vec<Package>;
     let non_existent_packages: Vec<String> = match check_packages_existance(&values).await {
-        Ok(packages) => packages,
+        Ok((non_existent_packages, packages)) => {
+            existent_packages = packages;
+            non_existent_packages
+        }
         Err(err) => {
             println!("{} {}", colorize(Type::Error, "Error:"), err);
             return;
         }
-    }; 
+    };
 
     if non_existent_packages.len() > 0 {
         println!(
@@ -41,13 +46,13 @@ pub async fn handle_install(values: Vec<String>) {
     let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
     let cache_path = std::path::Path::new(&cache_path);
 
-    values
+    existent_packages
         .iter()
         .for_each(|package| match clone_package(&package) {
             Ok(_) => println!("{}", colorize(Type::Info, "Package installed")),
             Err(e) => {
                 println!("{} {}", colorize(Type::Error, "Error:"), e);
-                std::fs::remove_dir_all(cache_path.join(&package)).unwrap();
+                std::fs::remove_dir_all(cache_path.join(&package.get_name())).unwrap();
             }
         });
 }
@@ -94,7 +99,7 @@ pub async fn handle_search(query: String) {
     let parsed_input: Result<usize, _> = input.parse();
 
     match parsed_input {
-        Ok(i) if i > 0 && i <= packages.len() => match clone_package(packages[i - 1].get_name()) {
+        Ok(i) if i > 0 && i <= packages.len() => match clone_package(&packages[i - 1]) {
             Ok(_) => println!("   {}\n", colorize(Type::Success, "Package installed")),
             Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
         },
@@ -179,7 +184,7 @@ pub async fn handle_update(values: Vec<String>) {
                     Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
                 }
             } else {
-                match clone_package(package.get_name()) {
+                match clone_package(package) {
                     Ok(_) => eprintln!(
                         "{} updated {}",
                         colorize(Type::Success, "Successfully"),
