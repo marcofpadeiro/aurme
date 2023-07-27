@@ -2,8 +2,9 @@ use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
 use reqwest;
-use select::document::Document;
+use serde_json::Value;
 use std::process::Command;
+use std::result;
 use std::sync::Arc;
 
 // variables and structs for ease of use
@@ -26,13 +27,34 @@ pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 * @param package_name: the name of the package
 * @return true if the package exists, false otherwise
 */
-pub async fn check_package_existance(
-    package_name: &str,
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let url = format!("{}/packages/{}", AUR_URL, package_name);
+pub async fn check_packages_existance(
+    package_names: &Vec<String>,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
+    url = format!("{}&arg[]={}", url, package_names.join("&arg[]="));
+    
     let res = fetch(&url).await.unwrap();
+    let json: Value = serde_json::from_str(&res).unwrap();
 
-    Ok(!res.contains("id=\"error-page\""))
+    let non_existent_packages: Vec<String> = match json["resultcount"].as_u64() {
+        Some(result_count) if result_count < package_names.len() as u64 => {
+            let existent_packages: Vec<String> = json["results"]
+                .as_array()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .map(|result| result["Name"].as_str().unwrap_or("").to_owned())
+                .collect();
+
+            package_names
+                .iter()
+                .filter(|package| !existent_packages.contains(package))
+                .cloned()
+                .collect()
+        }
+        _ => Vec::new(),
+    };
+
+    Ok(non_existent_packages)
 }
 
 /**
@@ -110,7 +132,7 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
             let name = package_parts.next().unwrap_or("").to_owned();
             let version = package_parts.next().unwrap_or("").to_owned();
 
-            Package::new(name, None, Some(version))
+            Package::new(name, None, Some(version), None, None)
         })
         .collect();
 
@@ -145,6 +167,8 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
                 package_name.clone(),
                 Some(package_name),
                 Some(package_version),
+                None,
+                None,
             ));
         } else {
             packages_missing.push(package);
@@ -223,34 +247,28 @@ pub fn check_dependency(dependency_name: &str) {
 * @return a vector of the top 10 packages
 */
 pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
-    let url = format!("{}/packages/?K={}", AUR_URL, package_name);
+    let url = format!("{}/rpc/?v=5&type=search&arg={}", AUR_URL, package_name);
     let res = fetch(&url).await.unwrap();
 
-    // find all a tags with packages href
-    Document::from(res.as_str())
-        .find(select::predicate::Name("tr"))
-        .flat_map(|n| n.find(select::predicate::Name("td")))
-        .flat_map(|n| n.find(select::predicate::Name("a")))
-        .filter(|n| n.attr("href").unwrap_or("").contains("/packages"))
-        .take(10)
-        .map(|n| n.text().trim().to_string())
-        .collect::<Vec<String>>()
-        .iter()
-        .zip(
-            // zip with the package description
-            Document::from(res.as_str())
-                .find(select::predicate::Name("tr"))
-                .flat_map(|n| n.find(select::predicate::Name("td")))
-                .filter(|n| n.attr("class").unwrap_or("") == "wrap")
-                .take(10)
-                .map(|n| n.text().trim().to_string())
-                .collect::<Vec<String>>()
-                .iter(),
-        )
-        .map(|(name, description)| {
-            Package::new(name.to_string(), Some(description.to_string()), None)
-        })
-        .collect()
+    let json: Value = serde_json::from_str(&res).unwrap();
+
+    let mut top_packages: Vec<Package> = Vec::new();
+    let results = json["results"].as_array().unwrap();
+    if results.is_empty() {
+        return top_packages;
+    }
+
+    for result in results.iter() {
+        let new = serde_json::from_value::<Package>(result.clone());
+        match new {
+            Ok(new) => top_packages.push(new),
+            Err(_) => continue,
+        }
+    }
+
+    top_packages.sort_by(|a, b| b.get_popularity().partial_cmp(&a.get_popularity()).unwrap());
+    top_packages.truncate(10);
+    top_packages
 }
 
 /**

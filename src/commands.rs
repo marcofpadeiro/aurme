@@ -3,7 +3,7 @@
 
 use crate::errors;
 use crate::helpers;
-use crate::helpers::check_package_existance;
+use crate::helpers::check_packages_existance;
 use crate::helpers::clone_package;
 use crate::helpers::CACHE_PATH;
 use crate::theme::colorize;
@@ -19,24 +19,22 @@ pub async fn handle_install(values: Vec<String>) {
         errors::handle_error("No packages specified");
     }
 
-    let mut non_existent_packages: Vec<&str> = Vec::new();
-
-    for package in values.iter() {
-        if let Ok(exists) = check_package_existance(&package).await {
-            if !exists {
-                non_existent_packages.push(&package);
-            }
+    let non_existent_packages: Vec<String> = match check_packages_existance(&values).await {
+        Ok(packages) => packages,
+        Err(err) => {
+            println!("{} {}", colorize(Type::Error, "Error:"), err);
+            return;
         }
-    }
+    }; 
 
     if non_existent_packages.len() > 0 {
         println!(
             "{} The following packages do not exist in the AUR:",
             colorize(Type::Error, "Error:")
         );
-        for package in non_existent_packages.iter() {
+        non_existent_packages.iter().for_each(|package| {
             println!("  {}", package);
-        }
+        });
         return;
     }
 

@@ -2,17 +2,25 @@ use crate::helpers::check_dependency;
 use crate::helpers::makepkg;
 use crate::helpers::CACHE_PATH;
 use serde_json::Value;
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Package {
+    #[serde(rename = "Name")]
     name: String,
+    #[serde(rename = "Version")]
     version: String,
+    #[serde(rename = "Description")]
     description: String,
+    #[serde(rename = "Popularity")]
+    popularity: f32,
+    #[serde(rename = "URLPath")]
+    url_path: String,
 }
 
 impl Package {
-    pub fn new(name: String, description: Option<String>, version: Option<String>) -> Package {
+    pub fn new(name: String, description: Option<String>, version: Option<String>, popularity: Option<f32>, url: Option<String>) -> Package {
         Package {
             name,
             description: match description {
@@ -23,6 +31,14 @@ impl Package {
                 Some(v) => v,
                 None => String::from("1"),
             },
+            popularity: match popularity {
+                Some(n) => n,
+                None => 0.0,
+            },
+            url_path: match url {
+                Some(u) => u,
+                None => String::from(""),
+            }
         }
     }
 
@@ -36,6 +52,14 @@ impl Package {
 
     pub fn get_version(&self) -> &str {
         &self.version
+    }
+
+    pub fn get_popularity(&self) -> f32 {
+        self.popularity
+    }
+
+    pub fn get_url_path(&self) -> &str {
+        &self.url_path
     }
 
     /**
