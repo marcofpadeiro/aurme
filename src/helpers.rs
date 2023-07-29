@@ -6,7 +6,6 @@ use reqwest;
 use serde_json::Value;
 use std::fs::File;
 use std::process::Command;
-use std::sync::Arc;
 use tar::Archive;
 
 // variables and structs for ease of use
@@ -24,8 +23,7 @@ pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 }
 
 /**
-* helper function to check if package exists
-* @param package_name: the name of the package
+* helper function to check if package exists @param package_name: the name of the package
 * @return true if the package exists, false otherwise
 */
 pub async fn check_packages_existance(
@@ -65,8 +63,6 @@ pub async fn check_packages_existance(
 pub fn clone_package(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
     let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
     let package_path: String = format!("{}/{}", cache_path, package.get_name());
-
-    check_dependency("git");
 
     if !std::path::Path::new(cache_path.as_str()).exists() {
         std::fs::create_dir_all(cache_path.as_str()).expect("Failed to create cache directory");
@@ -176,42 +172,27 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     }
 }
 
-/**
-* Checks for updates using threads
-* @param packages: a vector of packages to check for updates
-* @return tuple of package and the new version
-*/
-pub async fn check_for_updates_threads(
-    packages: Vec<Package>,
-) -> Result<Vec<(Package, String)>, Box<dyn std::error::Error>> {
-    let packages = Arc::new(packages);
+pub async fn check_for_updates(packages: Vec<Package>) -> Vec<Package> {
+    let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
+    packages.iter().for_each(|package| {
+        url = format!("{}&arg[]={}", url, package.get_name());
+    });
 
-    let mut tasks = Vec::new();
+    let res = fetch(&url).await.unwrap();
+    let json: Value = serde_json::from_str(&res).unwrap();
+    let rpc_packages: Vec<Package> = json["results"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|result| serde_json::from_value::<Package>(result.clone()).unwrap())
+        .collect();
 
-    for package in packages.iter() {
-        let package = package.clone();
-        let task = tokio::spawn(async move {
-            let result = package.check_for_package_updates().await;
-            match result {
-                Ok(result) => Ok(result),
-                Err(e) => Err(e),
-            }
-        });
-
-        tasks.push(task);
-    }
-
-    let mut results: Vec<(Package, String)> = Vec::new();
-
-    for task in tasks {
-        let result = task.await?;
-        match result {
-            Ok(result) => results.push(result),
-            Err(_) => continue,
-        }
-    }
-
-    Ok(results)
+    packages
+        .iter()
+        .zip(rpc_packages.iter())
+        .filter(|(package, rpc_package)| package.get_version() != rpc_package.get_version())
+        .map(|(_, rpc_package)| rpc_package.clone())
+        .collect()
 }
 
 /**

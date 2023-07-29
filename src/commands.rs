@@ -10,6 +10,7 @@ use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
 use std::io::{self, Write};
+use std::time::Instant;
 
 /**
 * Handle the install of packages
@@ -117,7 +118,7 @@ pub async fn handle_search(query: String) {
 pub async fn handle_update(values: Vec<String>) {
     println!("{} for updates...", colorize(Type::Info, "Checking"));
 
-    let packages_look_for_updates = if values.len() > 0 {
+    let local_packages = if values.len() > 0 {
         match helpers::check_if_packages_installed(values) {
             Ok(packages) => packages,
             Err(packages_missing) => {
@@ -133,9 +134,8 @@ pub async fn handle_update(values: Vec<String>) {
         helpers::get_installed_packages().expect("Error getting installed packages")
     };
 
-    let packages_need_updates = helpers::check_for_updates_threads(packages_look_for_updates)
-        .await
-        .expect("Error checking for updates");
+    let mut start = Instant::now();
+    let packages_need_updates = helpers::check_for_updates(local_packages.clone()).await;
 
     if packages_need_updates.len() == 0 {
         println!("No updates available");
@@ -149,14 +149,19 @@ pub async fn handle_update(values: Vec<String>) {
             format!("Packages ({}) ", packages_need_updates.len()).as_str()
         )
     );
-    packages_need_updates.iter().for_each(|(package, version)| {
-        println!(
-            "   {} ({} -> {})",
-            package.get_name(),
-            colorize(Type::Error, package.get_version()),
-            colorize(Type::Success, version),
-        );
-    });
+
+    local_packages
+        .iter()
+        .zip(packages_need_updates.clone())
+        .for_each(|(local_package, new_package)| {
+            println!(
+                "   {} ({} -> {})",
+                local_package.get_name(),
+                colorize(Type::Error, local_package.get_version()),
+                colorize(Type::Success, new_package.get_version()),
+            );
+        });
+    println!("CHeck updates {:?}", Instant::now() - start);
 
     print!("\nProceed with update? [Y/n]:");
     io::stdout().flush().unwrap();
@@ -171,29 +176,18 @@ pub async fn handle_update(values: Vec<String>) {
         return;
     }
 
+    start = Instant::now();
     packages_need_updates
         .iter()
-        .for_each(|(package, _version)| {
-            if package.check_if_package_in_cache() {
-                match package.pull_cached_package() {
-                    Ok(_) => eprintln!(
-                        "{} updated {}",
-                        colorize(Type::Success, "Successfully"),
-                        package.get_name()
-                    ),
-                    Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
-                }
-            } else {
-                match clone_package(package) {
-                    Ok(_) => eprintln!(
-                        "{} updated {}",
-                        colorize(Type::Success, "Successfully"),
-                        package.get_name()
-                    ),
-                    Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
-                }
-            }
+        .for_each(|package| match helpers::clone_package(&package) {
+            Ok(_) => eprintln!(
+                "{} updated {}",
+                colorize(Type::Success, "Successfully"),
+                package.get_name()
+            ),
+            Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
         });
+    println!("Update {:?}", Instant::now() - start)
 }
 
 /**
