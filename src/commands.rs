@@ -10,7 +10,6 @@ use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
 use std::io::{self, Write};
-use std::time::Instant;
 
 /**
 * Handle the install of packages
@@ -134,7 +133,6 @@ pub async fn handle_update(values: Vec<String>) {
         helpers::get_installed_packages().expect("Error getting installed packages")
     };
 
-    let mut start = Instant::now();
     let packages_need_updates = helpers::check_for_updates(local_packages.clone()).await;
 
     if packages_need_updates.len() == 0 {
@@ -150,18 +148,16 @@ pub async fn handle_update(values: Vec<String>) {
         )
     );
 
-    local_packages
+    packages_need_updates
         .iter()
-        .zip(packages_need_updates.clone())
-        .for_each(|(local_package, new_package)| {
+        .for_each(|(rpc_package, local_version)| {
             println!(
                 "   {} ({} -> {})",
-                local_package.get_name(),
-                colorize(Type::Error, local_package.get_version()),
-                colorize(Type::Success, new_package.get_version()),
+                rpc_package.get_name(),
+                colorize(Type::Error, local_version),
+                colorize(Type::Success, rpc_package.get_version()),
             );
         });
-    println!("CHeck updates {:?}", Instant::now() - start);
 
     print!("\nProceed with update? [Y/n]:");
     io::stdout().flush().unwrap();
@@ -176,10 +172,9 @@ pub async fn handle_update(values: Vec<String>) {
         return;
     }
 
-    start = Instant::now();
     packages_need_updates
         .iter()
-        .for_each(|package| match helpers::clone_package(&package) {
+        .for_each(|(package, _)| match helpers::clone_package(&package) {
             Ok(_) => eprintln!(
                 "{} updated {}",
                 colorize(Type::Success, "Successfully"),
@@ -187,7 +182,6 @@ pub async fn handle_update(values: Vec<String>) {
             ),
             Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
         });
-    println!("Update {:?}", Instant::now() - start)
 }
 
 /**

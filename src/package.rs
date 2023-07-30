@@ -56,8 +56,8 @@ impl Package {
         &self.version
     }
 
-    pub fn get_popularity(&self) -> f32 {
-        self.popularity
+    pub fn get_popularity(&self) -> &f32 {
+        &self.popularity
     }
 
     pub fn get_url_path(&self) -> String {
