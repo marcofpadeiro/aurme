@@ -172,7 +172,7 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     }
 }
 
-pub async fn check_for_updates(packages: Vec<Package>) -> Vec<Package> {
+pub async fn check_for_updates(packages: Vec<Package>) -> Vec<(Package, String)> {
     let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
     packages.iter().for_each(|package| {
         url = format!("{}&arg[]={}", url, package.get_name());
@@ -191,7 +191,7 @@ pub async fn check_for_updates(packages: Vec<Package>) -> Vec<Package> {
         .iter()
         .zip(rpc_packages.iter())
         .filter(|(package, rpc_package)| package.get_version() != rpc_package.get_version())
-        .map(|(_, rpc_package)| rpc_package.clone())
+        .map(|(package, rpc_package)| (rpc_package.clone(), package.get_version().to_owned()))
         .collect()
 }
 
