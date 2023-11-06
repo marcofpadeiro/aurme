@@ -213,13 +213,20 @@ pub async fn handle_cache_delete(packages: Vec<String>) {
             colorize(Type::Success, "Successfully"),
             packages_deleted
         );
-    } else {
-        std::fs::read_dir(cache_path).unwrap().for_each(|entry| {
-            let path = entry.unwrap().path();
-
-            std::fs::remove_dir_all(path).unwrap();
-        });
-
-        println!("{} cleared cache", colorize(Type::Success, "Successfully"));
+        return;
     }
+
+    // delete every folder in the cache_path
+    if let Ok(entries) = std::fs::read_dir(cache_path) {
+        entries.for_each(|entry| {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                std::fs::remove_dir_all(path).unwrap();
+            } else {
+                std::fs::remove_file(path).unwrap();
+            }
+        })
+    }
+
+    println!("{} cleared cache", colorize(Type::Success, "Successfully"));
 }
