@@ -5,8 +5,8 @@ use crate::errors;
 use crate::helpers;
 use crate::helpers::check_packages_existance;
 use crate::helpers::clone_package;
-use crate::helpers::CACHE_PATH;
 use crate::package::Package;
+use crate::settings::Settings;
 use crate::theme::colorize;
 use crate::theme::Type;
 use std::io::{self, Write};
@@ -15,7 +15,7 @@ use std::io::{self, Write};
 * Handle the install of packages
 * @param values: A vector of strings containing the packages to install
 */
-pub async fn handle_install(values: Vec<String>) {
+pub async fn handle_install(values: Vec<String>, user_settings: Settings) {
     if values.len() == 0 {
         errors::handle_error("No packages specified");
     }
@@ -43,12 +43,12 @@ pub async fn handle_install(values: Vec<String>) {
         return;
     }
 
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), user_settings.get_cache_path());
     let cache_path = std::path::Path::new(&cache_path);
 
     existent_packages
         .iter()
-        .for_each(|package| match clone_package(&package) {
+        .for_each(|package| match clone_package(&package, &user_settings) {
             Ok(_) => println!("{}", colorize(Type::Info, "Package installed")),
             Err(e) => {
                 println!("{} {}", colorize(Type::Error, "Error:"), e);
@@ -61,7 +61,7 @@ pub async fn handle_install(values: Vec<String>) {
 * Handle the search of packages
 * @param query: A string containing the package to search for
 */
-pub async fn handle_search(query: String) {
+pub async fn handle_search(query: String, user_settings: Settings) {
     if query.len() == 0 {
         errors::handle_error("no packages specified");
     }
@@ -99,7 +99,7 @@ pub async fn handle_search(query: String) {
     let parsed_input: Result<usize, _> = input.parse();
 
     match parsed_input {
-        Ok(i) if i > 0 && i <= packages.len() => match clone_package(&packages[i - 1]) {
+        Ok(i) if i > 0 && i <= packages.len() => match clone_package(&packages[i - 1], &user_settings) {
             Ok(_) => println!("   {}\n", colorize(Type::Success, "Package installed")),
             Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
         },
@@ -114,7 +114,7 @@ pub async fn handle_search(query: String) {
 * Handle the update of packages
 * @param values: A vector of strings containing the packages to update
 */
-pub async fn handle_update(values: Vec<String>) {
+pub async fn handle_update(values: Vec<String>, user_settings: Settings) {
     println!("{} for updates...", colorize(Type::Info, "Checking"));
 
     let local_packages = if values.len() > 0 {
@@ -174,7 +174,7 @@ pub async fn handle_update(values: Vec<String>) {
 
     packages_need_updates
         .iter()
-        .for_each(|(package, _)| match helpers::clone_package(&package) {
+        .for_each(|(package, _)| match helpers::clone_package(&package, &user_settings) {
             Ok(_) => eprintln!(
                 "{} updated {}",
                 colorize(Type::Success, "Successfully"),
@@ -188,13 +188,16 @@ pub async fn handle_update(values: Vec<String>) {
 * Handle the deletion of packages from the cache
 * @param values: A vector of strings containing the packages to delete from cache
 */
-pub async fn handle_cache_delete(packages: Vec<String>) {
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
+pub async fn handle_cache_delete(packages: Vec<String>, user_settings: Settings) {
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), user_settings.get_cache_path());
     let cache_path = std::path::Path::new(&cache_path);
 
     if !cache_path.exists() {
-        println!("Successfully cleared cache");
         std::fs::create_dir_all(cache_path).unwrap();
+        println!(
+            "{} cleared cache",
+            colorize(Type::Success, "Successfully"),
+        );
         return;
     }
 
