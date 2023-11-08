@@ -1,4 +1,5 @@
 use crate::package::Package;
+use crate::settings::Settings;
 use crate::theme::colorize;
 use crate::theme::Type;
 use flate2::read::GzDecoder;
@@ -10,7 +11,6 @@ use tar::Archive;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
-pub const CACHE_PATH: &str = ".cache/aurme";
 
 /**
 * helper function to fetch the html of a page
@@ -60,8 +60,8 @@ pub async fn check_packages_existance(
 * Clone a package from the AUR
 * @param package_name: the name of the package
 */
-pub fn clone_package(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), CACHE_PATH);
+pub fn clone_package(package: &Package, user_settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
+    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), user_settings.get_cache_path());
     let package_path: String = format!("{}/{}", cache_path, package.get_name());
 
     if !std::path::Path::new(cache_path.as_str()).exists() {
@@ -92,7 +92,7 @@ pub fn clone_package(package: &Package) -> Result<(), Box<dyn std::error::Error>
         colorize(Type::Success, "Successfully"),
         package.get_name()
     );
-    match makepkg(&package.get_name()) {
+    match makepkg(&package.get_name(), &user_settings) {
         Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
@@ -143,33 +143,32 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     let mut packages_missing: Vec<String> = Vec::new();
 
     for package in packages {
-        if installed_packages_str.contains(&package) {
-            // Extract the package name and version from the installed packages
-            let parts: Vec<&str> = installed_packages_str
-                .lines()
-                .find(|line| line.starts_with(&package))
-                .map(|line| line.split_whitespace().collect())
-                .unwrap_or_else(Vec::new);
-
-            let package_name = parts[0].to_owned();
-            let package_version = parts[1].to_owned();
-            packages_installed.push(Package::new(
-                package_name.clone(),
-                Some(package_name),
-                Some(package_version),
-                None,
-                None,
-            ));
-        } else {
+        if !installed_packages_str.contains(&package) {
             packages_missing.push(package);
+            continue;
         }
+        // Extract the package name and version from the installed packages
+        let parts: Vec<&str> = installed_packages_str
+            .lines()
+            .find(|line| line.starts_with(&package))
+            .map(|line| line.split_whitespace().collect())
+            .unwrap_or_else(Vec::new);
+
+        let package_name = parts[0].to_owned();
+        let package_version = parts[1].to_owned();
+        packages_installed.push(Package::new(
+            package_name.clone(),
+            Some(package_name),
+            Some(package_version),
+            None,
+            None,
+        ));
     }
 
     if packages_missing.is_empty() {
-        Ok(packages_installed)
-    } else {
-        Err(packages_missing)
-    }
+        return Ok(packages_installed)
+    } 
+    Err(packages_missing)
 }
 
 pub async fn check_for_updates(packages: Vec<Package>) -> Vec<(Package, String)> {
@@ -249,12 +248,12 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
 * Runs makepkg command to build a package
 * @param package_name: the name of the package to build
 */
-pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn makepkg(package_name: &str, user_settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
     let package_path: String = format!(
         "{}/{}/{}",
         home::home_dir().unwrap().display(),
-        CACHE_PATH,
+        user_settings.get_cache_path(),
         package_name
     );
 
@@ -264,13 +263,18 @@ pub fn makepkg(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let exit_status = Command::new("makepkg")
         .arg("-si")
         .arg("--noconfirm")
-        .current_dir(package_path)
+        .current_dir(package_path.clone())
         .output()
         .unwrap();
 
-    if exit_status.status.code().unwrap() != 0 {
-        Err(String::from_utf8_lossy(&exit_status.stderr).into())
-    } else {
-        Ok(())
+    // clear cache depending on user settings
+    if !user_settings.get_keep_cache() {
+        std::fs::remove_file(package_path.clone() + ".tar.gz").unwrap();
+        std::fs::remove_dir_all(package_path).unwrap();
     }
+
+    if exit_status.status.code().unwrap() != 0 {
+        return Err(String::from_utf8_lossy(&exit_status.stderr).into())
+    } 
+    Ok(())
 }

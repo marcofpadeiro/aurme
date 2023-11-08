@@ -5,6 +5,7 @@ mod commands;
 mod errors;
 mod helpers;
 mod package;
+mod settings;
 mod theme;
 
 #[tokio::main]
