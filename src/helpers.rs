@@ -60,8 +60,15 @@ pub async fn check_packages_existance(
 * Clone a package from the AUR
 * @param package_name: the name of the package
 */
-pub fn clone_package(package: &Package, user_settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path: String = format!("{}/{}", home::home_dir().unwrap().display(), user_settings.get_cache_path());
+pub fn clone_package(
+    package: &Package,
+    user_settings: &Settings,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let cache_path: String = format!(
+        "{}/{}",
+        home::home_dir().unwrap().display(),
+        user_settings.get_cache_path()
+    );
     let package_path: String = format!("{}/{}", cache_path, package.get_name());
 
     if !std::path::Path::new(cache_path.as_str()).exists() {
@@ -167,8 +174,8 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     }
 
     if packages_missing.is_empty() {
-        return Ok(packages_installed)
-    } 
+        return Ok(packages_installed);
+    }
     Err(packages_missing)
 }
 
@@ -249,7 +256,10 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
 * Runs makepkg command to build a package
 * @param package_name: the name of the package to build
 */
-pub fn makepkg(package_name: &str, user_settings: &Settings) -> Result<(), Box<dyn std::error::Error>> {
+pub fn makepkg(
+    package_name: &str,
+    user_settings: &Settings,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
     let package_path: String = format!(
         "{}/{}/{}",
@@ -274,8 +284,9 @@ pub fn makepkg(package_name: &str, user_settings: &Settings) -> Result<(), Box<d
         .stdout(stdout)
         .stderr(stderr)
         .current_dir(package_path.clone())
-        .spawn().expect("Error spawning makepkg process")
-        .wait_with_output().expect("Error running makepkg process");
+        .spawn()?
+        .wait_with_output()
+        .expect("Error running makepkg process");
 
     // clear cache depending on user settings
     if !user_settings.get_keep_cache() {
@@ -284,7 +295,10 @@ pub fn makepkg(package_name: &str, user_settings: &Settings) -> Result<(), Box<d
     }
 
     if exit_status.status.code().unwrap() != 0 {
-        return Err(String::from_utf8_lossy(&exit_status.stderr).into())
-    } 
+        if user_settings.get_verbose() != "quiet" {
+            return Err("Check Above Output".into());
+        }
+        return Err(String::from_utf8_lossy(&exit_status.stderr).into());
+    }
     Ok(())
 }
