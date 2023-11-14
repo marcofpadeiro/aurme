@@ -73,6 +73,7 @@ pub fn clone_package(package: &Package, user_settings: &Settings) -> Result<(), 
         std::fs::remove_dir_all(package_path.as_str()).expect("Failed to remove old package");
     }
 
+    check_dependency("curl");
     // specify the directory to clone the package to
     Command::new("curl")
         .arg("-L")
@@ -260,12 +261,21 @@ pub fn makepkg(package_name: &str, user_settings: &Settings) -> Result<(), Box<d
     check_dependency("fakeroot");
     check_dependency("make");
 
+    let mut no_confirm = String::from("--noconfirm");
+    if !user_settings.get_no_confirm() {
+        no_confirm = String::from("");
+    }
+
+    let (stdout, stderr) = user_settings.get_verbose_settings();
+
     let exit_status = Command::new("makepkg")
         .arg("-si")
-        .arg("--noconfirm")
+        .arg(no_confirm)
+        .stdout(stdout)
+        .stderr(stderr)
         .current_dir(package_path.clone())
-        .output()
-        .unwrap();
+        .spawn().expect("Error spawning makepkg process")
+        .wait_with_output().expect("Error running makepkg process");
 
     // clear cache depending on user settings
     if !user_settings.get_keep_cache() {
