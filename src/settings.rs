@@ -89,8 +89,8 @@ fn create_default(path: &Path) -> Settings {
     let settings = Settings {
         cache_path: String::from(CACHE_PATH),
         keep_cache: true,
-        no_confirm: true,
-        verbose: String::from("normal"),
+        no_confirm: false,
+        verbose: String::from("default"),
     };
     let json = serde_json::to_string_pretty(&settings).unwrap();
     if let Err(_) = std::fs::metadata(settings_folder_path) {
