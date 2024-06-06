@@ -1,5 +1,5 @@
 use crate::package::Package;
-use crate::settings::Settings;
+use crate::config::Config;
 use crate::theme::colorize;
 use crate::theme::Type;
 use flate2::read::GzDecoder;
@@ -27,10 +27,11 @@ pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 * @return true if the package exists, false otherwise
 */
 pub async fn check_packages_existance(
-    package_names: &Vec<String>,
+    package_names: &Vec<&str>,
 ) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
     let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
-    url = format!("{}&arg[]={}", url, package_names.join("&arg[]="));
+
+    url = format!("{}&arg[]={}", url, package_names.join(","));
 
     let res = fetch(&url).await.unwrap();
     let json: Value = serde_json::from_str(&res).unwrap();
@@ -62,12 +63,12 @@ pub async fn check_packages_existance(
 */
 pub fn clone_package(
     package: &Package,
-    user_settings: &Settings,
+    user_config: &Config,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let cache_path: String = format!(
         "{}/{}",
         home::home_dir().unwrap().display(),
-        user_settings.get_cache_path()
+        user_config.get_cache_path()
     );
     let package_path: String = format!("{}/{}", cache_path, package.get_name());
 
@@ -100,7 +101,7 @@ pub fn clone_package(
         colorize(Type::Success, "Successfully"),
         package.get_name()
     );
-    match makepkg(&package.get_name(), &user_settings) {
+    match makepkg(&package.get_name(), &user_config) {
         Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
@@ -258,13 +259,13 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
 */
 pub fn makepkg(
     package_name: &str,
-    user_settings: &Settings,
+    user_config: &Config,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
     let package_path: String = format!(
         "{}/{}/{}",
         home::home_dir().unwrap().display(),
-        user_settings.get_cache_path(),
+        user_config.get_cache_path(),
         package_name
     );
 
@@ -272,11 +273,11 @@ pub fn makepkg(
     check_dependency("make");
 
     let mut no_confirm = String::from("--noconfirm");
-    if !user_settings.get_no_confirm() {
+    if !user_config.get_no_confirm() {
         no_confirm = String::from("");
     }
 
-    let (stdout, stderr) = user_settings.get_verbose_settings();
+    let (stdout, stderr) = user_config.get_verbose_config();
 
     let exit_status = Command::new("makepkg")
         .arg("-si")
@@ -288,14 +289,14 @@ pub fn makepkg(
         .wait_with_output()
         .expect("Error running makepkg process");
 
-    // clear cache depending on user settings
-    if !user_settings.get_keep_cache() {
+    // clear cache depending on user config
+    if !user_config.get_keep_cache() {
         std::fs::remove_file(package_path.clone() + ".tar.gz").unwrap();
         std::fs::remove_dir_all(package_path).unwrap();
     }
 
     if exit_status.status.code().unwrap() != 0 {
-        if user_settings.get_verbose() != "quiet" {
+        if user_config.get_verbose() != "quiet" {
             return Err("Check Above Output".into());
         }
         return Err(String::from_utf8_lossy(&exit_status.stderr).into());

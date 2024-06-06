@@ -1,25 +1,36 @@
-use std::env;
+use crate::handlers::*;
+use clap::Command;
+use command_line::build_sync_command;
 
-mod cmd;
-mod commands;
-mod errors;
+mod command_line;
+mod config;
+mod handlers;
 mod helpers;
 mod package;
-mod settings;
 mod theme;
 
 #[tokio::main]
 async fn main() {
-    let args: Vec<String> = env::args().skip(1).collect();
+    let matches = Command::new("aurme")
+        .about("AUR wrapper utility")
+        .version("0.0.1")
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .subcommand(build_sync_command())
+        .get_matches();
 
-    let config = cmd::Config::build(&args).unwrap_or_else(|err| {
-        errors::handle_error(err);
-        std::process::exit(1);
-    });
+    let config = config::read();
 
-    run(config).await;
-}
+    let command_handler: Box<dyn handler::CommandHandler> = match matches.subcommand() {
+        Some(("sync", sync_matches)) => match () {
+            _ if sync_matches.contains_id("search") => Box::new(search::SearchHandler),
+            _ if sync_matches.get_flag("info") => Box::new(info::InfoHandler),
+            _ if sync_matches.get_flag("refresh") => Box::new(refresh::RefreshHandler),
+            _ if sync_matches.get_flag("sysupgrade") => Box::new(sysupgrade::SysUpgradeHandler),
+            _ => Box::new(install::InstallHandler),
+        },
+        _ => unreachable!(),
+    };
 
-async fn run(config: cmd::Config) {
-    config.handle_args().await;
+    command_handler.handle(&matches, &config).await;
 }

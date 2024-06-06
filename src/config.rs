@@ -5,18 +5,18 @@ use serde::{Deserialize, Serialize};
 use crate::theme;
 
 const DEFAULT_PATH: &str = ".config/aurme";
-const SETTINGS_FILE: &str = "settings.json";
+const SETTINGS_FILE: &str = "config.json";
 const CACHE_PATH: &str = ".cache/aurme";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Settings {
+pub struct Config {
     cache_path: String,
     keep_cache: bool,
     no_confirm: bool,
     verbose: String,
 }
 
-impl Settings {
+impl Config {
     pub fn get_cache_path(&self) -> &str {
         &self.cache_path
     }
@@ -33,7 +33,7 @@ impl Settings {
         &self.verbose
     }
 
-    pub fn get_verbose_settings(&self) -> (Stdio, Stdio) {
+    pub fn get_verbose_config(&self) -> (Stdio, Stdio) {
         match self.verbose.as_str() {
             "verbose" => (
                 std::process::Stdio::inherit(),
@@ -45,7 +45,7 @@ impl Settings {
     }
 }
 
-pub fn read() -> Settings {
+pub fn read() -> Config {
     let path = format!(
         "{}/{}/{}",
         home::home_dir().unwrap().display(),
@@ -59,22 +59,22 @@ pub fn read() -> Settings {
     }
 
     let json = std::fs::read_to_string(config_path).unwrap();
-    if let Ok(settings) = serde_json::from_str::<Settings>(&json) {
-        return settings;
+    if let Ok(config) = serde_json::from_str::<Config>(&json) {
+        return config;
     }
 
     println!(
         "{}",
         theme::colorize(
             theme::Type::Warning,
-            "Your settings file has been updated to the latest version."
+            "Your config file has been updated to the latest version."
         )
     );
     println!(
         "{}",
         theme::colorize(
             theme::Type::Warning,
-            "Old settings file has been renamed to settings.json.old."
+            "Old config file has been renamed to config.json.old."
         )
     );
     std::fs::rename(config_path, format!("{}.old", path)).unwrap();
@@ -82,20 +82,20 @@ pub fn read() -> Settings {
     create_default(config_path)
 }
 
-fn create_default(path: &Path) -> Settings {
-    let settings_folder = format!("{}/{}", home::home_dir().unwrap().display(), DEFAULT_PATH);
-    let settings_folder_path = std::path::Path::new(&settings_folder);
+fn create_default(path: &Path) -> Config {
+    let config_folder = format!("{}/{}", home::home_dir().unwrap().display(), DEFAULT_PATH);
+    let config_folder_path = std::path::Path::new(&config_folder);
 
-    let settings = Settings {
+    let config = Config {
         cache_path: String::from(CACHE_PATH),
         keep_cache: true,
         no_confirm: false,
         verbose: String::from("default"),
     };
-    let json = serde_json::to_string_pretty(&settings).unwrap();
-    if let Err(_) = std::fs::metadata(settings_folder_path) {
-        std::fs::create_dir_all(settings_folder_path).unwrap();
+    let json = serde_json::to_string_pretty(&config).unwrap();
+    if let Err(_) = std::fs::metadata(config_folder_path) {
+        std::fs::create_dir_all(config_folder_path).unwrap();
     }
     std::fs::write(path, json).unwrap();
-    settings
+    config
 }
