@@ -1,6 +1,6 @@
-use crate::handlers::*;
-use clap::Command;
-use command_line::build_sync_command;
+use clap::{ArgMatches, Command};
+use command_line::{build_sync_command, get_sync_handler};
+use handlers::handler;
 
 mod command_line;
 mod config;
@@ -21,16 +21,11 @@ async fn main() {
 
     let config = config::read();
 
-    let command_handler: Box<dyn handler::CommandHandler> = match matches.subcommand() {
-        Some(("sync", sync_matches)) => match () {
-            _ if sync_matches.contains_id("search") => Box::new(search::SearchHandler),
-            _ if sync_matches.get_flag("info") => Box::new(info::InfoHandler),
-            _ if sync_matches.get_flag("refresh") => Box::new(refresh::RefreshHandler),
-            _ if sync_matches.get_flag("sysupgrade") => Box::new(sysupgrade::SysUpgradeHandler),
-            _ => Box::new(install::InstallHandler),
-        },
-        _ => unreachable!(),
-    };
+    let (command_handler, res_matches): (Box<dyn handler::CommandHandler>, &ArgMatches) =
+        match matches.subcommand() {
+            Some(("sync", sync_matches)) => (get_sync_handler(sync_matches), sync_matches),
+            _ => unreachable!(),
+        };
 
-    command_handler.handle(&matches, &config).await;
+    command_handler.handle(res_matches, &config).await;
 }

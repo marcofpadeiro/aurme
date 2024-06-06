@@ -1,4 +1,5 @@
-use clap::{Arg, ArgAction, Command};
+use crate::handlers::*;
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
 pub fn build_sync_command() -> Command {
     Command::new("sync")
@@ -7,12 +8,12 @@ pub fn build_sync_command() -> Command {
         .about("Synchronize packages.")
         .arg(
             Arg::new("search")
-                .long("search")
-                .conflicts_with_all(&["info", "sysupgrade", "refresh"])
                 .short('s')
-                .num_args(1)
+                .long("search")
+                .help("search remote repositories for matching strings")
+                .conflicts_with_all(&["info", "sysupgrade", "refresh"])
                 .action(ArgAction::Set)
-                .help("search remote repositories for matching strings"),
+                .num_args(1),
         )
         .arg(
             Arg::new("info")
@@ -45,4 +46,14 @@ pub fn build_sync_command() -> Command {
                 .action(ArgAction::Set)
                 .num_args(1..),
         )
+}
+
+pub fn get_sync_handler(sync_matches: &ArgMatches) -> Box<dyn handler::CommandHandler> {
+    match () {
+        _ if sync_matches.contains_id("search") => Box::new(search::SearchHandler),
+        _ if sync_matches.get_flag("info") => Box::new(info::InfoHandler),
+        _ if sync_matches.get_flag("refresh") => Box::new(refresh::RefreshHandler),
+        _ if sync_matches.get_flag("sysupgrade") => Box::new(sysupgrade::SysUpgradeHandler),
+        _ => Box::new(install::InstallHandler),
+    }
 }
