@@ -1,108 +1,85 @@
-use std::{path::Path, process::Stdio};
+use std::{path::PathBuf, process::Stdio};
 
+use aurme::expand_path;
 use serde::{Deserialize, Serialize};
 
 use crate::theme;
 
-const DEFAULT_PATH: &str = ".config/aurme";
-const SETTINGS_FILE: &str = "config.json";
-const CACHE_PATH: &str = ".cache/aurme";
-const PACKAGES_CACHE_PATH: &str = ".cache/aurme/packages";
+const CACHE_PATH: &str = "~/.cache/aurme";
+const PACKAGES_CACHE_PATH: &str = "~/.cache/aurme/packages";
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum VerboseOtion {
+    Quiet,
+    Default,
+    Verbose,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
-    cache_path: String,
-    db_path: String,
-    keep_cache: bool,
-    no_confirm: bool,
-    verbose: String,
+    pub cache_path: String,
+    pub db_path: String,
+    pub keep_cache: bool,
+    pub no_confirm: bool,
+    pub verbose: VerboseOtion,
 }
 
 impl Config {
-    pub fn get_cache_path(&self) -> &str {
-        &self.cache_path
+    pub fn default() -> Config {
+        Config {
+            cache_path: String::from(PACKAGES_CACHE_PATH),
+            db_path: String::from(CACHE_PATH),
+            keep_cache: true,
+            no_confirm: false,
+            verbose: VerboseOtion::Default,
+        }
     }
 
-    pub fn get_db_path(&self) -> &str {
-        &self.db_path
+    fn create(config: &Config, config_path: &PathBuf) -> Result<(), std::io::Error> {
+        let json = serde_json::to_string_pretty(&config)?;
+        if let Err(_) = std::fs::metadata(config_path) {
+            std::fs::create_dir_all(
+                config_path
+                    .parent()
+                    .expect("Path doesn't have a parent directory"),
+            )?;
+        }
+
+        std::fs::write(config_path, json)
     }
 
-    pub fn get_keep_cache(&self) -> bool {
-        self.keep_cache
-    }
+    pub fn read(path: &str) -> Result<Config, std::io::Error> {
+        let config_path: PathBuf = expand_path(path);
 
-    pub fn get_no_confirm(&self) -> bool {
-        self.no_confirm
-    }
+        if !config_path.exists() {
+            let default = Config::default();
+            Config::create(&default, &config_path)?;
+            return Ok(default);
+        }
 
-    pub fn get_verbose(&self) -> &str {
-        &self.verbose
+        let json = std::fs::read_to_string(config_path)?;
+        match serde_json::from_str::<Config>(&json) {
+            Ok(config) => return Ok(config),
+            Err(_) => eprintln!(
+                "{}",
+                theme::colorize(
+                    theme::Type::Warning,
+                    "Couldn't read config file. Running off the default config"
+                )
+            ),
+        };
+
+        Ok(Config::default())
     }
 
     pub fn get_verbose_config(&self) -> (Stdio, Stdio) {
-        match self.verbose.as_str() {
-            "verbose" => (
+        match self.verbose {
+            VerboseOtion::Verbose => (
                 std::process::Stdio::inherit(),
                 std::process::Stdio::inherit(),
             ),
-            "quiet" => (std::process::Stdio::piped(), std::process::Stdio::piped()),
-            _ => (std::process::Stdio::piped(), std::process::Stdio::inherit()),
+            VerboseOtion::Quiet => (std::process::Stdio::piped(), std::process::Stdio::piped()),
+            VerboseOtion::Default => (std::process::Stdio::piped(), std::process::Stdio::inherit()),
         }
     }
-}
-
-pub fn read() -> Config {
-    let path = format!(
-        "{}/{}/{}",
-        home::home_dir().unwrap().display(),
-        DEFAULT_PATH,
-        SETTINGS_FILE
-    );
-    let config_path = std::path::Path::new(&path);
-
-    if let Err(_) = std::fs::metadata(config_path) {
-        return create_default(config_path);
-    }
-
-    let json = std::fs::read_to_string(config_path).unwrap();
-    if let Ok(config) = serde_json::from_str::<Config>(&json) {
-        return config;
-    }
-
-    println!(
-        "{}",
-        theme::colorize(
-            theme::Type::Warning,
-            "Your config file has been updated to the latest version."
-        )
-    );
-    println!(
-        "{}",
-        theme::colorize(
-            theme::Type::Warning,
-            "Old config file has been renamed to config.json.old."
-        )
-    );
-    std::fs::rename(config_path, format!("{}.old", path)).unwrap();
-
-    create_default(config_path)
-}
-
-fn create_default(path: &Path) -> Config {
-    let config_folder = format!("{}/{}", home::home_dir().unwrap().display(), DEFAULT_PATH);
-    let config_folder_path = std::path::Path::new(&config_folder);
-
-    let config = Config {
-        cache_path: String::from(PACKAGES_CACHE_PATH),
-        db_path: String::from(CACHE_PATH),
-        keep_cache: true,
-        no_confirm: false,
-        verbose: String::from("default"),
-    };
-    let json = serde_json::to_string_pretty(&config).unwrap();
-    if let Err(_) = std::fs::metadata(config_folder_path) {
-        std::fs::create_dir_all(config_folder_path).unwrap();
-    }
-    std::fs::write(path, json).unwrap();
-    config
 }

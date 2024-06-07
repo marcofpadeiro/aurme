@@ -1,6 +1,9 @@
 use std::io::{self, Write};
 
-use crate::helpers::{self, clone_package};
+use crate::{
+    database::read_database,
+    helpers::{self, clone_package},
+};
 use async_trait::async_trait;
 
 use crate::theme::{colorize, Type};
@@ -13,7 +16,7 @@ pub struct SearchHandler;
 impl CommandHandler for SearchHandler {
     async fn handle(&self, matches: &clap::ArgMatches, config: &crate::config::Config) {
         let search_term = matches.get_one::<String>("search").unwrap();
-        let packages_db = helpers::get_db(&config).await;
+        let packages_db = read_database(&config).await.unwrap();
 
         let packages = helpers::get_top_packages(&search_term, &packages_db).await;
 
@@ -28,7 +31,7 @@ impl CommandHandler for SearchHandler {
             println!(
                 "\n{} {}\n  {}",
                 colorize(Type::Info, format!("{} ┃", len - i).as_str()),
-                colorize(Type::Header, package.get_name()),
+                colorize(Type::Header, package.name.as_str()),
                 package.get_description()
             );
         });

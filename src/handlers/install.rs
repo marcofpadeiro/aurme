@@ -1,4 +1,4 @@
-use crate::helpers::{clone_package, get_db};
+use crate::{database::read_database, helpers::clone_package};
 use async_trait::async_trait;
 
 use crate::{
@@ -19,19 +19,20 @@ impl CommandHandler for InstallHandler {
             .map(|vals| vals.map(|s| s.as_str()).collect())
             .unwrap_or_else(Vec::new);
 
-        let packages_db = get_db(&config).await;
+        let packages_db = read_database(&config).await.unwrap();
 
         let existent_packages: Vec<Package>;
-        let non_existent_packages: Vec<String> = match check_packages_existance(&packages, &packages_db) {
-            Ok((non_existent_packages, packages)) => {
-                existent_packages = packages;
-                non_existent_packages
-            }
-            Err(err) => {
-                println!("{} {}", colorize(Type::Error, "\nError:"), err);
-                return;
-            }
-        };
+        let non_existent_packages: Vec<String> =
+            match check_packages_existance(&packages, &packages_db) {
+                Ok((non_existent_packages, packages)) => {
+                    existent_packages = packages;
+                    non_existent_packages
+                }
+                Err(err) => {
+                    println!("{} {}", colorize(Type::Error, "Error:"), err);
+                    return;
+                }
+            };
 
         if non_existent_packages.len() > 0 {
             println!(
@@ -47,7 +48,7 @@ impl CommandHandler for InstallHandler {
         let cache_path: String = format!(
             "{}/{}",
             home::home_dir().unwrap().display(),
-            config.get_cache_path()
+            config.cache_path
         );
         let cache_path = std::path::Path::new(&cache_path);
 
@@ -56,8 +57,8 @@ impl CommandHandler for InstallHandler {
             .for_each(|package| match clone_package(&package, &config) {
                 Ok(_) => println!("{}", colorize(Type::Info, "Package installed")),
                 Err(e) => {
-                    println!("{} {}", colorize(Type::Error, "\nError:"), e);
-                    std::fs::remove_dir_all(cache_path.join(&package.get_name())).unwrap();
+                    println!("{} {}", colorize(Type::Error, "Error:"), e);
+                    std::fs::remove_dir_all(cache_path.join(&package.name)).unwrap();
                 }
             });
     }

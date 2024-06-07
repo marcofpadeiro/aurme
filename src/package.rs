@@ -4,17 +4,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Package {
     #[serde(rename = "Name")]
-    name: String,
+    pub name: String,
     #[serde(rename = "Version")]
-    version: String,
+    pub version: String,
     #[serde(rename = "Description", default)]
-    description: Option<String>,
+    pub description: Option<String>,
     #[serde(rename = "Popularity")]
-    popularity: f32,
+    pub popularity: f32,
     #[serde(rename = "URLPath")]
-    url_path: String,
+    pub url_path: String,
     #[serde(rename = "Depends", default)]
-    depends: Option<Vec<String>>,
+    pub depends: Option<Vec<String>>,
 }
 
 impl Package {
@@ -49,18 +49,6 @@ impl Package {
                 None => None,
             },
         }
-    }
-
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn get_version(&self) -> &str {
-        &self.version
-    }
-
-    pub fn get_popularity(&self) -> &f32 {
-        &self.popularity
     }
 
     pub fn get_url_path(&self) -> String {

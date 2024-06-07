@@ -1,19 +1,18 @@
 use crate::config::Config;
+use crate::config::VerboseOtion;
 use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
+use aurme::expand_path;
 use flate2::read::GzDecoder;
 use reqwest;
 use serde_json::Value;
 use std::fs::File;
-use std::io::Read;
-use std::io::Write;
 use std::process::Command;
 use tar::Archive;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
-pub const DB_NAME: &str = "packages-meta-ext-v1.json";
 
 /**
 * helper function to fetch the html of a page
@@ -35,7 +34,7 @@ pub fn check_packages_existance(
 ) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
     let existent_packages: Vec<Package> = packages_db
         .iter()
-        .filter(|package| package_names.contains(&package.get_name()))
+        .filter(|package| package_names.contains(&package.name.as_str()))
         .map(|package| package.clone())
         .collect();
 
@@ -45,7 +44,7 @@ pub fn check_packages_existance(
         .filter(|package_name| {
             !existent_packages
                 .iter()
-                .any(|package| package.get_name() == **package_name)
+                .any(|package| package.name == **package_name)
         })
         .map(|package_name| package_name.to_string())
         .collect();
@@ -61,86 +60,40 @@ pub fn clone_package(
     package: &Package,
     user_config: &Config,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path: String = format!(
-        "{}/{}",
-        home::home_dir().unwrap().display(),
-        user_config.get_cache_path()
-    );
-    let package_path: String = format!("{}/{}", cache_path, package.get_name());
+    let cache_path = expand_path(user_config.cache_path.as_str());
+    let package_folder = cache_path.join(&package.name);
 
-    if !std::path::Path::new(cache_path.as_str()).exists() {
-        std::fs::create_dir_all(cache_path.as_str()).expect("Failed to create cache directory");
+    if !cache_path.exists() {
+        std::fs::create_dir_all(&cache_path).expect("Failed to create cache directory");
     }
 
-    //// if dir with package name already exists, delete it
-    if std::path::Path::new(package_path.as_str()).exists() {
-        std::fs::remove_dir_all(package_path.as_str()).expect("Failed to remove old package");
+    if package_folder.exists() {
+        std::fs::remove_dir_all(package_folder).expect("Failed to remove old package");
     }
 
     check_dependency("curl");
-    // specify the directory to clone the package to
     Command::new("curl")
         .arg("-L")
         .arg("-O")
         .arg("--output-dir")
-        .arg(cache_path.clone())
+        .arg(&cache_path)
         .arg(package.get_url_path())
         .output()
         .unwrap();
 
-    let file = File::open(package_path.clone() + ".tar.gz")?;
+    let file = File::open(cache_path.join(format!("{}.tar.gz", package.name)))?;
     let mut archive = Archive::new(GzDecoder::new(file));
     archive.unpack(cache_path.clone())?;
 
     println!(
-        "{} cloned package {}",
+        "{} downloaded package {}",
         colorize(Type::Success, "Successfully"),
-        package.get_name()
+        package.name
     );
-    match makepkg(&package.get_name(), &user_config) {
+    match makepkg(&package.name, &user_config) {
         Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
-}
-
-pub async fn sync_db(db_path: &str) {
-    // download the database
-    let url = format!("{}/{}.gz", AUR_URL, DB_NAME);
-    let res = reqwest::get(&url).await.unwrap();
-    if let Err(_) = std::fs::metadata(db_path) {
-        std::fs::create_dir_all(db_path).unwrap();
-    }
-
-    let db_path = format!("{}/{}.gz", db_path, DB_NAME);
-    let mut file = File::create(db_path.clone()).unwrap();
-    let content = res.bytes().await.unwrap();
-    file.write_all(&content).unwrap();
-
-    // extract the database to jason
-    let file = File::open(&db_path).unwrap();
-    let mut decoder = GzDecoder::new(file);
-    let mut json_str = String::new();
-    decoder.read_to_string(&mut json_str).unwrap();
-
-    let json_path = db_path.trim_end_matches(".gz");
-    let mut json_file = File::create(&json_path).unwrap();
-    json_file.write_all(json_str.as_bytes()).unwrap();
-    std::fs::remove_file(db_path).unwrap();
-}
-
-pub async fn get_db(user_config: &Config) -> Vec<Package> {
-    let db_location = format!(
-        "{}/{}",
-        home::home_dir().unwrap().display(),
-        user_config.get_db_path(),
-    );
-    let db_path = format!("{}/{}", db_location, DB_NAME);
-    let db_path = std::path::Path::new(&db_path);
-    if let Err(_) = std::fs::metadata(db_path) {
-        sync_db(&db_location).await;
-    }
-
-    serde_json::from_str(&std::fs::read_to_string(db_path).unwrap()).unwrap()
 }
 
 /**
@@ -220,7 +173,7 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
 pub async fn check_for_updates(packages: Vec<Package>) -> Vec<(Package, String)> {
     let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
     packages.iter().for_each(|package| {
-        url = format!("{}&arg[]={}", url, package.get_name());
+        url = format!("{}&arg[]={}", url, package.name);
     });
 
     let res = fetch(&url).await.unwrap();
@@ -235,8 +188,8 @@ pub async fn check_for_updates(packages: Vec<Package>) -> Vec<(Package, String)>
     packages
         .iter()
         .zip(rpc_packages.iter())
-        .filter(|(package, rpc_package)| package.get_version() != rpc_package.get_version())
-        .map(|(package, rpc_package)| (rpc_package.clone(), package.get_version().to_owned()))
+        .filter(|(package, rpc_package)| package.version != rpc_package.version)
+        .map(|(package, rpc_package)| (rpc_package.clone(), package.version.to_owned()))
         .collect()
 }
 
@@ -270,7 +223,7 @@ pub async fn get_top_packages(package_name: &str, packages_db: &Vec<Package>) ->
         .iter()
         .filter(|package| {
             package
-                .get_name()
+                .name
                 .to_lowercase()
                 .contains(&package_name.to_lowercase())
                 || package
@@ -285,7 +238,7 @@ pub async fn get_top_packages(package_name: &str, packages_db: &Vec<Package>) ->
         return top_packages;
     }
 
-    top_packages.sort_by(|a, b| b.get_popularity().partial_cmp(&a.get_popularity()).unwrap());
+    top_packages.sort_by(|a, b| b.popularity.partial_cmp(&a.popularity).unwrap());
     top_packages.truncate(10);
     top_packages
 }
@@ -296,18 +249,13 @@ pub async fn get_top_packages(package_name: &str, packages_db: &Vec<Package>) ->
 */
 pub fn makepkg(package_name: &str, user_config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
-    let package_path: String = format!(
-        "{}/{}/{}",
-        home::home_dir().unwrap().display(),
-        user_config.get_cache_path(),
-        package_name
-    );
+    let package_path = expand_path(&user_config.cache_path).join(package_name);
 
     check_dependency("fakeroot");
     check_dependency("make");
 
     let mut no_confirm = String::from("--noconfirm");
-    if !user_config.get_no_confirm() {
+    if !user_config.no_confirm {
         no_confirm = String::from("");
     }
 
@@ -324,16 +272,16 @@ pub fn makepkg(package_name: &str, user_config: &Config) -> Result<(), Box<dyn s
         .expect("Error running makepkg process");
 
     // clear cache depending on user config
-    if !user_config.get_keep_cache() {
-        std::fs::remove_file(package_path.clone() + ".tar.gz").unwrap();
+    if !user_config.keep_cache {
+        std::fs::remove_file(format!("{}.tar.gz", package_path.display())).unwrap();
         std::fs::remove_dir_all(package_path).unwrap();
     }
 
     if exit_status.status.code().unwrap() != 0 {
-        if user_config.get_verbose() != "quiet" {
-            return Err("Check Above Output".into());
-        }
-        return Err(String::from_utf8_lossy(&exit_status.stderr).into());
+        return Err(match &user_config.verbose {
+            VerboseOtion::Quiet => String::from_utf8_lossy(&exit_status.stderr).into(),
+            _ => "Check Above Output".into(),
+        });
     }
     Ok(())
 }
