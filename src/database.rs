@@ -5,11 +5,12 @@ use std::{
     io::{Read, Write},
 };
 
-use crate::{config::Config, helpers::AUR_URL, package::Package};
+use crate::{config::Config, helpers::AUR_URL, package::Package, theme::{colorize, Type}};
 
 pub const DB_NAME: &str = "packages-meta-ext-v1.json";
 
 pub async fn download_database(config: &Config) -> Result<String, Box<dyn std::error::Error>> {
+    println!("{}", colorize(Type::Info, "Synchronising package database..."));
     let db_path = expand_path(config.db_path.as_str());
     let json_path = db_path.join(DB_NAME);
 
@@ -27,6 +28,7 @@ pub async fn download_database(config: &Config) -> Result<String, Box<dyn std::e
 
     let mut json_file = File::create(&json_path)?;
     json_file.write_all(json_str.as_bytes())?;
+    println!("  {}", colorize(Type::Success, "Database is up to date"));
 
     Ok(json_str)
 }

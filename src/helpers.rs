@@ -5,24 +5,12 @@ use crate::theme::colorize;
 use crate::theme::Type;
 use aurme::expand_path;
 use flate2::read::GzDecoder;
-use reqwest;
-use serde_json::Value;
 use std::fs::File;
 use std::process::Command;
 use tar::Archive;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
-
-/**
-* helper function to fetch the html of a page
-* @param url: the url of the page
-* @return the html of the page
-*/
-pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let res = reqwest::get(url).await?.text().await?;
-    Ok(res)
-}
 
 /**
 * helper function to check if package exists @param package_name: the name of the package
@@ -81,7 +69,7 @@ pub fn clone_package(
         .output()
         .unwrap();
 
-    let file = File::open(cache_path.join(format!("{}.tar.gz", package.name)))?;
+    let file = File::open(format!("{}/{}.tar.gz", cache_path.display(), package.name))?;
     let mut archive = Archive::new(GzDecoder::new(file));
     archive.unpack(cache_path.clone())?;
 
@@ -168,29 +156,6 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
         return Ok(packages_installed);
     }
     Err(packages_missing)
-}
-
-pub async fn check_for_updates(packages: Vec<Package>) -> Vec<(Package, String)> {
-    let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
-    packages.iter().for_each(|package| {
-        url = format!("{}&arg[]={}", url, package.name);
-    });
-
-    let res = fetch(&url).await.unwrap();
-    let json: Value = serde_json::from_str(&res).unwrap();
-    let rpc_packages: Vec<Package> = json["results"]
-        .as_array()
-        .unwrap_or(&Vec::new())
-        .iter()
-        .map(|result| serde_json::from_value::<Package>(result.clone()).unwrap())
-        .collect();
-
-    packages
-        .iter()
-        .zip(rpc_packages.iter())
-        .filter(|(package, rpc_package)| package.version != rpc_package.version)
-        .map(|(package, rpc_package)| (rpc_package.clone(), package.version.to_owned()))
-        .collect()
 }
 
 /**

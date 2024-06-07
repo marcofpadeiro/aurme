@@ -61,8 +61,4 @@ impl Package {
             None => "No description provided",
         }
     }
-
-    pub fn get_depends(&self) -> Option<&Vec<String>> {
-        self.depends.as_ref()
-    }
 }
