@@ -13,8 +13,9 @@ pub struct SearchHandler;
 impl CommandHandler for SearchHandler {
     async fn handle(&self, matches: &clap::ArgMatches, config: &crate::config::Config) {
         let search_term = matches.get_one::<String>("search").unwrap();
+        let packages_db = helpers::get_db(&config).await;
 
-        let packages = helpers::get_top_packages(&search_term).await;
+        let packages = helpers::get_top_packages(&search_term, &packages_db).await;
 
         let len = packages.len();
         if len == 0 {
@@ -50,7 +51,7 @@ impl CommandHandler for SearchHandler {
             Ok(i) if i > 0 && i <= packages.len() => {
                 match clone_package(&packages[i - 1], &config) {
                     Ok(_) => println!("   {}\n", colorize(Type::Success, "Package installed")),
-                    Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
+                    Err(e) => println!("{} {}", colorize(Type::Error, "\nError:"), e),
                 }
             }
             _ => println!(

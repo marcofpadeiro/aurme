@@ -110,16 +110,18 @@ pub async fn sync_db(db_path: &str) {
     if let Err(_) = std::fs::metadata(db_path) {
         std::fs::create_dir_all(db_path).unwrap();
     }
+
     let db_path = format!("{}/{}.gz", db_path, DB_NAME);
     let mut file = File::create(db_path.clone()).unwrap();
     let content = res.bytes().await.unwrap();
     file.write_all(&content).unwrap();
 
-    // extract the database
+    // extract the database to jason
     let file = File::open(&db_path).unwrap();
     let mut decoder = GzDecoder::new(file);
     let mut json_str = String::new();
     decoder.read_to_string(&mut json_str).unwrap();
+
     let json_path = db_path.trim_end_matches(".gz");
     let mut json_file = File::create(&json_path).unwrap();
     json_file.write_all(json_str.as_bytes()).unwrap();
@@ -263,24 +265,24 @@ pub fn check_dependency(dependency_name: &str) {
 * @param package_name: the package name to search for
 * @return a vector of the top 10 packages
 */
-pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
-    let url = format!("{}/rpc/?v=5&type=search&arg={}", AUR_URL, package_name);
-    let res = fetch(&url).await.unwrap();
+pub async fn get_top_packages(package_name: &str, packages_db: &Vec<Package>) -> Vec<Package> {
+    let mut top_packages: Vec<Package> = packages_db
+        .iter()
+        .filter(|package| {
+            package
+                .get_name()
+                .to_lowercase()
+                .contains(&package_name.to_lowercase())
+                || package
+                    .get_description()
+                    .to_lowercase()
+                    .contains(&package_name.to_lowercase())
+        })
+        .map(|package| package.clone())
+        .collect();
 
-    let json: Value = serde_json::from_str(&res).unwrap();
-
-    let mut top_packages: Vec<Package> = Vec::new();
-    let results = json["results"].as_array().unwrap();
-    if results.is_empty() {
+    if top_packages.is_empty() {
         return top_packages;
-    }
-
-    for result in results.iter() {
-        let new = serde_json::from_value::<Package>(result.clone());
-        match new {
-            Ok(new) => top_packages.push(new),
-            Err(_) => continue,
-        }
     }
 
     top_packages.sort_by(|a, b| b.get_popularity().partial_cmp(&a.get_popularity()).unwrap());

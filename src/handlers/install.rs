@@ -28,7 +28,7 @@ impl CommandHandler for InstallHandler {
                 non_existent_packages
             }
             Err(err) => {
-                println!("{} {}", colorize(Type::Error, "Error:"), err);
+                println!("{} {}", colorize(Type::Error, "\nError:"), err);
                 return;
             }
         };
@@ -36,7 +36,7 @@ impl CommandHandler for InstallHandler {
         if non_existent_packages.len() > 0 {
             println!(
                 "{} The following packages do not exist in the AUR:",
-                colorize(Type::Error, "Error:")
+                colorize(Type::Error, "\nError:")
             );
             non_existent_packages.iter().for_each(|package| {
                 println!("  {}", package);
@@ -56,7 +56,7 @@ impl CommandHandler for InstallHandler {
             .for_each(|package| match clone_package(&package, &config) {
                 Ok(_) => println!("{}", colorize(Type::Info, "Package installed")),
                 Err(e) => {
-                    println!("{} {}", colorize(Type::Error, "Error:"), e);
+                    println!("{} {}", colorize(Type::Error, "\nError:"), e);
                     std::fs::remove_dir_all(cache_path.join(&package.get_name())).unwrap();
                 }
             });

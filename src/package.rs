@@ -55,10 +55,6 @@ impl Package {
         &self.name
     }
 
-    pub fn get_description(&self) -> &str {
-        &self.description.as_ref().unwrap()
-    }
-
     pub fn get_version(&self) -> &str {
         &self.version
     }
@@ -69,5 +65,16 @@ impl Package {
 
     pub fn get_url_path(&self) -> String {
         AUR_URL.to_owned() + &self.url_path
+    }
+
+    pub fn get_description(&self) -> &str {
+        match &self.description {
+            Some(d) => d,
+            None => "No description provided",
+        }
+    }
+
+    pub fn get_depends(&self) -> Option<&Vec<String>> {
+        self.depends.as_ref()
     }
 }
