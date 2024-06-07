@@ -7,12 +7,14 @@ pub struct Package {
     name: String,
     #[serde(rename = "Version")]
     version: String,
-    #[serde(rename = "Description")]
-    description: String,
+    #[serde(rename = "Description", default)]
+    description: Option<String>,
     #[serde(rename = "Popularity")]
     popularity: f32,
     #[serde(rename = "URLPath")]
     url_path: String,
+    #[serde(rename = "Depends", default)]
+    depends: Option<Vec<String>>,
 }
 
 impl Package {
@@ -22,12 +24,13 @@ impl Package {
         version: Option<String>,
         popularity: Option<f32>,
         url: Option<String>,
+        depends: Option<Vec<String>>,
     ) -> Package {
         Package {
             name,
             description: match description {
-                Some(d) => d,
-                None => String::from("No description provided"),
+                Some(d) => Some(d),
+                None => Some(String::from("No description provided")),
             },
             version: match version {
                 Some(v) => v,
@@ -41,6 +44,10 @@ impl Package {
                 Some(u) => u,
                 None => String::from(""),
             },
+            depends: match depends {
+                Some(d) => Some(d),
+                None => None,
+            },
         }
     }
 
@@ -49,7 +56,7 @@ impl Package {
     }
 
     pub fn get_description(&self) -> &str {
-        &self.description
+        &self.description.as_ref().unwrap()
     }
 
     pub fn get_version(&self) -> &str {

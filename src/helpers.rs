@@ -1,16 +1,19 @@
-use crate::package::Package;
 use crate::config::Config;
+use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
 use flate2::read::GzDecoder;
 use reqwest;
 use serde_json::Value;
 use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 use std::process::Command;
 use tar::Archive;
 
 // variables and structs for ease of use
 pub const AUR_URL: &str = "https://aur.archlinux.org";
+pub const DB_NAME: &str = "packages-meta-ext-v1.json";
 
 /**
 * helper function to fetch the html of a page
@@ -26,21 +29,14 @@ pub async fn fetch(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 * helper function to check if package exists @param package_name: the name of the package
 * @return true if the package exists, false otherwise
 */
-pub async fn check_packages_existance(
+pub fn check_packages_existance(
     package_names: &Vec<&str>,
+    packages_db: &Vec<Package>,
 ) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
-    let mut url = format!("{}/rpc/?v=5&type=info", AUR_URL);
-
-    url = format!("{}&arg[]={}", url, package_names.join(","));
-
-    let res = fetch(&url).await.unwrap();
-    let json: Value = serde_json::from_str(&res).unwrap();
-
-    let existent_packages: Vec<Package> = json["results"]
-        .as_array()
-        .unwrap_or(&Vec::new())
+    let existent_packages: Vec<Package> = packages_db
         .iter()
-        .map(|result| serde_json::from_value::<Package>(result.clone()).unwrap())
+        .filter(|package| package_names.contains(&package.get_name()))
+        .map(|package| package.clone())
         .collect();
 
     // filter out the packages that don't exist
@@ -107,6 +103,44 @@ pub fn clone_package(
     }
 }
 
+pub async fn sync_db(db_path: &str) {
+    // download the database
+    let url = format!("{}/{}.gz", AUR_URL, DB_NAME);
+    let res = reqwest::get(&url).await.unwrap();
+    if let Err(_) = std::fs::metadata(db_path) {
+        std::fs::create_dir_all(db_path).unwrap();
+    }
+    let db_path = format!("{}/{}.gz", db_path, DB_NAME);
+    let mut file = File::create(db_path.clone()).unwrap();
+    let content = res.bytes().await.unwrap();
+    file.write_all(&content).unwrap();
+
+    // extract the database
+    let file = File::open(&db_path).unwrap();
+    let mut decoder = GzDecoder::new(file);
+    let mut json_str = String::new();
+    decoder.read_to_string(&mut json_str).unwrap();
+    let json_path = db_path.trim_end_matches(".gz");
+    let mut json_file = File::create(&json_path).unwrap();
+    json_file.write_all(json_str.as_bytes()).unwrap();
+    std::fs::remove_file(db_path).unwrap();
+}
+
+pub async fn get_db(user_config: &Config) -> Vec<Package> {
+    let db_location = format!(
+        "{}/{}",
+        home::home_dir().unwrap().display(),
+        user_config.get_db_path(),
+    );
+    let db_path = format!("{}/{}", db_location, DB_NAME);
+    let db_path = std::path::Path::new(&db_path);
+    if let Err(_) = std::fs::metadata(db_path) {
+        sync_db(&db_location).await;
+    }
+
+    serde_json::from_str(&std::fs::read_to_string(db_path).unwrap()).unwrap()
+}
+
 /**
 * Checks system for installed packages
 * @return: a vector of installed packages
@@ -131,7 +165,7 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
             let name = package_parts.next().unwrap_or("").to_owned();
             let version = package_parts.next().unwrap_or("").to_owned();
 
-            Package::new(name, None, Some(version), None, None)
+            Package::new(name, None, Some(version), None, None, None)
         })
         .collect();
 
@@ -169,6 +203,7 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
             package_name.clone(),
             Some(package_name),
             Some(package_version),
+            None,
             None,
             None,
         ));
@@ -257,10 +292,7 @@ pub async fn get_top_packages(package_name: &str) -> Vec<Package> {
 * Runs makepkg command to build a package
 * @param package_name: the name of the package to build
 */
-pub fn makepkg(
-    package_name: &str,
-    user_config: &Config,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn makepkg(package_name: &str, user_config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
     let package_path: String = format!(
         "{}/{}/{}",

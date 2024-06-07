@@ -1,4 +1,4 @@
-use crate::helpers::clone_package;
+use crate::helpers::{clone_package, get_db};
 use async_trait::async_trait;
 
 use crate::{
@@ -19,8 +19,10 @@ impl CommandHandler for InstallHandler {
             .map(|vals| vals.map(|s| s.as_str()).collect())
             .unwrap_or_else(Vec::new);
 
+        let packages_db = get_db(&config).await;
+
         let existent_packages: Vec<Package>;
-        let non_existent_packages: Vec<String> = match check_packages_existance(&packages).await {
+        let non_existent_packages: Vec<String> = match check_packages_existance(&packages, &packages_db) {
             Ok((non_existent_packages, packages)) => {
                 existent_packages = packages;
                 non_existent_packages

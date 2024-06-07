@@ -7,10 +7,12 @@ use crate::theme;
 const DEFAULT_PATH: &str = ".config/aurme";
 const SETTINGS_FILE: &str = "config.json";
 const CACHE_PATH: &str = ".cache/aurme";
+const PACKAGES_CACHE_PATH: &str = ".cache/aurme/packages";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     cache_path: String,
+    db_path: String,
     keep_cache: bool,
     no_confirm: bool,
     verbose: String,
@@ -19,6 +21,10 @@ pub struct Config {
 impl Config {
     pub fn get_cache_path(&self) -> &str {
         &self.cache_path
+    }
+
+    pub fn get_db_path(&self) -> &str {
+        &self.db_path
     }
 
     pub fn get_keep_cache(&self) -> bool {
@@ -87,7 +93,8 @@ fn create_default(path: &Path) -> Config {
     let config_folder_path = std::path::Path::new(&config_folder);
 
     let config = Config {
-        cache_path: String::from(CACHE_PATH),
+        cache_path: String::from(PACKAGES_CACHE_PATH),
+        db_path: String::from(CACHE_PATH),
         keep_cache: true,
         no_confirm: false,
         verbose: String::from("default"),
