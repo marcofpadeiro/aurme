@@ -6,6 +6,7 @@ use crate::theme::Type;
 use aurme::expand_path;
 use flate2::read::GzDecoder;
 use std::fs::File;
+use std::io::Write;
 use std::process::Command;
 use tar::Archive;
 
@@ -44,11 +45,11 @@ pub fn check_packages_existance(
 * Clone a package from the AUR
 * @param package_name: the name of the package
 */
-pub fn clone_package(
+pub async fn download_package(
     package: &Package,
-    user_config: &Config,
+    config: &Config,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path = expand_path(user_config.cache_path.as_str());
+    let cache_path = expand_path(config.cache_path.as_str());
     let package_folder = cache_path.join(&package.name);
 
     if !cache_path.exists() {
@@ -59,29 +60,23 @@ pub fn clone_package(
         std::fs::remove_dir_all(package_folder).expect("Failed to remove old package");
     }
 
-    check_dependency("curl");
-    Command::new("curl")
-        .arg("-L")
-        .arg("-O")
-        .arg("--output-dir")
-        .arg(&cache_path)
-        .arg(package.get_url_path())
-        .output()
-        .unwrap();
+    let response = reqwest::get(package.get_url_path()).await?.bytes().await?;
+    let file_path = cache_path.join(format!("{}.tar.gz", package.name));
 
-    let file = File::open(format!("{}/{}.tar.gz", cache_path.display(), package.name))?;
+    let mut file = File::create(&file_path)?;
+    file.write_all(&response)?;
+
+    let file = File::open(&file_path)?;
     let mut archive = Archive::new(GzDecoder::new(file));
-    archive.unpack(cache_path.clone())?;
+
+    archive.unpack(cache_path)?;
 
     println!(
         "{} downloaded package {}",
         colorize(Type::Success, "Successfully"),
         package.name
     );
-    match makepkg(&package.name, &user_config) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(e),
-    }
+    Ok(())
 }
 
 /**
@@ -212,19 +207,19 @@ pub async fn get_top_packages(package_name: &str, packages_db: &Vec<Package>) ->
 * Runs makepkg command to build a package
 * @param package_name: the name of the package to build
 */
-pub fn makepkg(package_name: &str, user_config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+pub fn makepkg(package_name: &str, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
-    let package_path = expand_path(&user_config.cache_path).join(package_name);
+    let package_path = expand_path(&config.cache_path).join(package_name);
 
     check_dependency("fakeroot");
     check_dependency("make");
 
     let mut no_confirm = String::from("--noconfirm");
-    if !user_config.no_confirm {
+    if !config.no_confirm {
         no_confirm = String::from("");
     }
 
-    let (stdout, stderr) = user_config.get_verbose_config();
+    let (stdout, stderr) = config.get_verbose_config();
 
     let exit_status = Command::new("makepkg")
         .arg("-si")
@@ -237,13 +232,13 @@ pub fn makepkg(package_name: &str, user_config: &Config) -> Result<(), Box<dyn s
         .expect("Error running makepkg process");
 
     // clear cache depending on user config
-    if !user_config.keep_cache {
+    if !config.keep_cache {
         std::fs::remove_file(format!("{}.tar.gz", package_path.display())).unwrap();
         std::fs::remove_dir_all(package_path).unwrap();
     }
 
     if exit_status.status.code().unwrap() != 0 {
-        return Err(match &user_config.verbose {
+        return Err(match &config.verbose {
             VerboseOtion::Quiet => String::from_utf8_lossy(&exit_status.stderr).into(),
             _ => "Check Above Output".into(),
         });

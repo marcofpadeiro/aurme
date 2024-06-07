@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     database::read_database,
-    helpers::{clone_package, get_installed_packages},
+    helpers::{download_package, get_installed_packages, makepkg},
     package::Package,
     theme::{colorize, Type},
 };
@@ -67,15 +67,18 @@ impl CommandHandler for SysUpgradeHandler {
             return;
         }
 
-        outdated
-            .iter()
-            .for_each(|(_, package)| match clone_package(&package, &config) {
-                Ok(_) => eprintln!(
-                    "{} updated {}",
-                    colorize(Type::Success, "Successfully"),
-                    package.name
-                ),
+        for (_, package) in outdated.iter() {
+            match download_package(&package, &config).await {
+                Ok(_) => {
+                    eprintln!(
+                        "{} updated {}",
+                        colorize(Type::Success, "Successfully"),
+                        package.name
+                    );
+                    makepkg(package.name.as_str(), &config).unwrap();
+                }
                 Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
-            });
+            };
+        }
     }
 }

@@ -1,4 +1,7 @@
-use crate::{database::read_database, helpers::clone_package};
+use crate::{
+    database::read_database,
+    helpers::{download_package, makepkg},
+};
 use async_trait::async_trait;
 
 use crate::{
@@ -52,14 +55,17 @@ impl CommandHandler for InstallHandler {
         );
         let cache_path = std::path::Path::new(&cache_path);
 
-        existent_packages
-            .iter()
-            .for_each(|package| match clone_package(&package, &config) {
-                Ok(_) => println!("{}", colorize(Type::Info, "Package installed")),
+        for package in existent_packages.iter() {
+            match download_package(&package, &config).await {
+                Ok(_) => {
+                    println!("{}", colorize(Type::Info, "Package installed"));
+                    makepkg(&package.name, &config).unwrap()
+                }
                 Err(e) => {
                     println!("{} {}", colorize(Type::Error, "Error:"), e);
                     std::fs::remove_dir_all(cache_path.join(&package.name)).unwrap();
                 }
-            });
+            };
+        }
     }
 }

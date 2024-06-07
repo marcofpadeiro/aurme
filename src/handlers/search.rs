@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use crate::{
     database::read_database,
-    helpers::{self, clone_package},
+    helpers::{self, download_package, makepkg},
 };
 use async_trait::async_trait;
 
@@ -52,8 +52,11 @@ impl CommandHandler for SearchHandler {
 
         match parsed_input {
             Ok(i) if i > 0 && i <= packages.len() => {
-                match clone_package(&packages[i - 1], &config) {
-                    Ok(_) => println!("   {}\n", colorize(Type::Success, "Package installed")),
+                match download_package(&packages[i - 1], &config).await {
+                    Ok(_) => {
+                        println!("   {}\n", colorize(Type::Success, "Package installed"));
+                        makepkg(packages[i - 1].name.as_str(), &config).unwrap()
+                    }
                     Err(e) => println!("{} {}", colorize(Type::Error, "\nError:"), e),
                 }
             }
