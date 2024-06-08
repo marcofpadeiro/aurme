@@ -1,6 +1,34 @@
 use crate::handlers::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
+use async_trait::async_trait;
+use handler::CommandHandler;
+
+pub struct CompositeHandler {
+    handlers: Vec<Box<dyn handler::CommandHandler + Send + Sync>>,
+}
+
+impl CompositeHandler {
+    pub fn new() -> Self {
+        CompositeHandler {
+            handlers: Vec::new(),
+        }
+    }
+
+    pub fn add_handler(&mut self, handler: Box<dyn handler::CommandHandler + Send + Sync>) {
+        self.handlers.push(handler);
+    }
+}
+
+#[async_trait]
+impl handler::CommandHandler for CompositeHandler {
+    async fn handle(&self, matches: &clap::ArgMatches, config: &crate::config::Config) {
+        for handler in &self.handlers {
+            handler.handle(matches, config).await;
+        }
+    }
+}
+
 pub fn build_sync_command() -> Command {
     Command::new("sync")
         .short_flag('S')
@@ -48,12 +76,28 @@ pub fn build_sync_command() -> Command {
         )
 }
 
-pub fn get_sync_handler(sync_matches: &ArgMatches) -> Box<dyn handler::CommandHandler> {
-    match () {
-        _ if sync_matches.contains_id("search") => Box::new(search::SearchHandler),
-        _ if sync_matches.get_flag("info") => Box::new(info::InfoHandler),
-        _ if sync_matches.get_flag("refresh") => Box::new(refresh::RefreshHandler),
-        _ if sync_matches.get_flag("sysupgrade") => Box::new(sysupgrade::SysUpgradeHandler),
-        _ => Box::new(install::InstallHandler),
+pub fn get_sync_handler(sync_matches: &ArgMatches) -> Box<dyn CommandHandler + Send + Sync> {
+    if sync_matches.contains_id("search") {
+        return Box::new(search::SearchHandler);
+    }
+
+    if sync_matches.get_flag("info") {
+        return Box::new(info::InfoHandler);
+    }
+
+    let mut composite_handler = CompositeHandler::new();
+
+    if sync_matches.get_flag("refresh") {
+        composite_handler.add_handler(Box::new(refresh::RefreshHandler));
+    }
+
+    if sync_matches.get_flag("sysupgrade") {
+        composite_handler.add_handler(Box::new(sysupgrade::SysUpgradeHandler));
+    }
+
+    if !composite_handler.handlers.is_empty() {
+        Box::new(composite_handler)
+    } else {
+        Box::new(install::InstallHandler)
     }
 }
