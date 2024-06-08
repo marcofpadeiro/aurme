@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     database::read_database,
-    helpers::{download_package, get_installed_packages, makepkg},
+    helpers::{download_package, get_installed_packages, makepkg, name_to_key},
     package::Package,
     theme::{colorize, Type},
 };
@@ -17,20 +17,20 @@ pub struct SysUpgradeHandler;
 impl CommandHandler for SysUpgradeHandler {
     async fn handle(&self, _matches: &clap::ArgMatches, config: &crate::config::Config) {
         let packages_db = read_database(&config).await.unwrap();
-        let mut installed_packages = get_installed_packages().unwrap();
-
         let mut outdated: Vec<(Package, Package)> = Vec::new();
-        packages_db.iter().for_each(|package| {
-            installed_packages.retain(|installed_package| {
-                if installed_package.name == package.name {
-                    if installed_package.version != package.version {
-                        outdated.push((installed_package.clone(), package.clone()));
+        get_installed_packages()
+            .unwrap()
+            .iter()
+            .for_each(|package| {
+                if let Some(packages) = packages_db.get(&name_to_key(&package.name)) {
+                    let db_package = packages.iter().find(|p| p.name == package.name);
+                    if let Some(db_package) = db_package {
+                        if db_package.version != package.version {
+                            outdated.push((package.clone(), db_package.clone()));
+                        }
                     }
-                    return false;
                 }
-                true
             });
-        });
 
         if outdated.len() == 0 {
             println!("{}", colorize(Type::Header, "System is up to date"));

@@ -1,10 +1,12 @@
 use crate::config::Config;
 use crate::config::VerboseOtion;
+use crate::database::NON_ALPHA;
 use crate::package::Package;
 use crate::theme::colorize;
 use crate::theme::Type;
 use aurme::expand_path;
 use flate2::read::GzDecoder;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::process::Command;
@@ -19,13 +21,17 @@ pub const AUR_URL: &str = "https://aur.archlinux.org";
 */
 pub fn check_packages_existance(
     package_names: &Vec<&str>,
-    packages_db: &Vec<Package>,
+    packages_db: &HashMap<String, Vec<Package>>,
 ) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
-    let existent_packages: Vec<Package> = packages_db
-        .iter()
-        .filter(|package| package_names.contains(&package.name.as_str()))
-        .map(|package| package.clone())
-        .collect();
+    let mut existent_packages: Vec<Package> = Vec::new();
+    package_names.iter().for_each(|package| {
+        if let Some(packages) = packages_db.get(&name_to_key(package)) {
+            let package = packages.iter().find(|p| p.name == *package);
+            if let Some(package) = package {
+                existent_packages.push(package.clone());
+            }
+        }
+    });
 
     // filter out the packages that don't exist
     let non_existent = package_names
@@ -110,6 +116,7 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
     Ok(installed_packages)
 }
 
+#[allow(dead_code)]
 pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>, Vec<String>> {
     let installed_packages_output = Command::new("pacman")
         .arg("-Qm")
@@ -153,6 +160,14 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     Err(packages_missing)
 }
 
+pub fn name_to_key(package_name: &str) -> String {
+    let first_char = package_name.chars().next().unwrap();
+    match first_char.is_alphabetic() {
+        true => first_char.to_uppercase().to_string(),
+        false => NON_ALPHA.to_string(),
+    }
+}
+
 /**
 * Checks if a dependency is installed in the system
 * @param dependency_name: the name of the dependency
@@ -178,9 +193,10 @@ pub fn check_dependency(dependency_name: &str) {
 * @param package_name: the package name to search for
 * @return a vector of the top 10 packages
 */
-pub async fn get_top_packages(package_name: &str, packages_db: &Vec<Package>) -> Vec<Package> {
+pub fn get_top_packages(package_name: &str, packages_db: &HashMap<String, Vec<Package>>) -> Vec<Package> {
     let mut top_packages: Vec<Package> = packages_db
         .iter()
+        .flat_map(|(_, packages)| packages.iter())
         .filter(|package| {
             package
                 .name

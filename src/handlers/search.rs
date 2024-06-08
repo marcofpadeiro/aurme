@@ -18,7 +18,7 @@ impl CommandHandler for SearchHandler {
         let search_term = matches.get_one::<String>("search").unwrap();
         let packages_db = read_database(&config).await.unwrap();
 
-        let packages = helpers::get_top_packages(&search_term, &packages_db).await;
+        let packages = helpers::get_top_packages(&search_term, &packages_db);
 
         let len = packages.len();
         if len == 0 {
@@ -26,7 +26,6 @@ impl CommandHandler for SearchHandler {
             return;
         }
 
-        // print packages
         packages.iter().rev().enumerate().for_each(|(i, package)| {
             println!(
                 "\n{} {}\n  {}",
