@@ -58,8 +58,8 @@ impl CommandHandler for InstallHandler {
         for package in existent_packages.iter() {
             match download_package(&package, &config).await {
                 Ok(_) => {
+                    makepkg(&package.name, &config).unwrap();
                     println!("{}", colorize(Type::Info, "Package installed"));
-                    makepkg(&package.name, &config).unwrap()
                 }
                 Err(e) => {
                     println!("{} {}", colorize(Type::Error, "Error:"), e);

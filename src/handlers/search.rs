@@ -53,8 +53,8 @@ impl CommandHandler for SearchHandler {
             Ok(i) if i > 0 && i <= packages.len() => {
                 match download_package(&packages[i - 1], &config).await {
                     Ok(_) => {
+                        makepkg(packages[i - 1].name.as_str(), &config).unwrap();
                         println!("   {}\n", colorize(Type::Success, "Package installed"));
-                        makepkg(packages[i - 1].name.as_str(), &config).unwrap()
                     }
                     Err(e) => println!("{} {}", colorize(Type::Error, "\nError:"), e),
                 }
