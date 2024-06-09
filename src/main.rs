@@ -2,7 +2,7 @@ use std::process::exit;
 
 use clap::{ArgMatches, Command};
 use command_line::{build_sync_command, get_sync_handler};
-use config::Config;
+use config::{Config, DEFAULT_CONFIG_PATH};
 use handlers::handler;
 
 mod command_line;
@@ -12,8 +12,6 @@ mod handlers;
 mod helpers;
 mod package;
 mod theme;
-
-const DEFAULT_CONFIG_PATH: &str = "~/.config/aurme/config.json";
 
 #[tokio::main]
 async fn main() {

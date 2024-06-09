@@ -7,6 +7,8 @@ use crate::theme;
 
 const CACHE_PATH: &str = "~/.cache/aurme";
 const PACKAGES_CACHE_PATH: &str = "~/.cache/aurme/packages";
+pub const DEFAULT_CONFIG_PATH: &str = "~/.config/aurme/config.json";
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum VerboseOtion {
