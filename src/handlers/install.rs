@@ -1,8 +1,8 @@
 use crate::{
-    database::read_database,
-    helpers::{download_package, makepkg},
+    config::PACKAGES_CACHE_PATH, database::read_database, helpers::{download_package, makepkg}
 };
 use async_trait::async_trait;
+use aurme::expand_path;
 
 use crate::{
     helpers::check_packages_existance,
@@ -22,7 +22,7 @@ impl CommandHandler for InstallHandler {
             .map(|vals| vals.map(|s| s.as_str()).collect())
             .unwrap_or_else(Vec::new);
 
-        let packages_db = read_database(&config).await.unwrap();
+        let packages_db = read_database().await.unwrap();
 
         let existent_packages: Vec<Package>;
         let non_existent_packages: Vec<String> =
@@ -48,15 +48,11 @@ impl CommandHandler for InstallHandler {
             return;
         }
 
-        let cache_path: String = format!(
-            "{}/{}",
-            home::home_dir().unwrap().display(),
-            config.cache_path
-        );
+        let cache_path = expand_path(PACKAGES_CACHE_PATH);
         let cache_path = std::path::Path::new(&cache_path);
 
         for package in existent_packages.iter() {
-            match download_package(&package, &config).await {
+            match download_package(&package).await {
                 Ok(_) => {
                     makepkg(&package.name, &config).unwrap();
                     println!("{}", colorize(Type::Info, "Package installed"));

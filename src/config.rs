@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::theme;
 
-const CACHE_PATH: &str = "~/.cache/aurme";
-const PACKAGES_CACHE_PATH: &str = "~/.cache/aurme/packages";
-pub const DEFAULT_CONFIG_PATH: &str = "~/.config/aurme/config.json";
+pub const CACHE_PATH: &str = "~/.cache/aurme";
+pub const PACKAGES_CACHE_PATH: &str = "~/.cache/aurme/packages";
+pub const CONFIG_PATH: &str = "~/.config/aurme/config.json";
 
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -19,8 +19,6 @@ pub enum VerboseOtion {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
-    pub cache_path: String,
-    pub db_path: String,
     pub keep_cache: bool,
     pub no_confirm: bool,
     pub verbose: VerboseOtion,
@@ -29,8 +27,6 @@ pub struct Config {
 impl Config {
     pub fn default() -> Config {
         Config {
-            cache_path: String::from(PACKAGES_CACHE_PATH),
-            db_path: String::from(CACHE_PATH),
             keep_cache: true,
             no_confirm: false,
             verbose: VerboseOtion::Default,

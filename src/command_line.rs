@@ -52,6 +52,14 @@ pub fn build_sync_command() -> Command {
                 .help("view package information"),
         )
         .arg(
+            Arg::new("clear")
+                .long("clear")
+                .short('c')
+                .conflicts_with_all(&["search", "sysupgrade", "refresh"])
+                .action(ArgAction::SetTrue)
+                .help("clear package cache"),
+        )
+        .arg(
             Arg::new("refresh")
                 .long("refresh")
                 .short('y')
@@ -70,7 +78,7 @@ pub fn build_sync_command() -> Command {
         .arg(
             Arg::new("package")
                 .help("packages")
-                .required_unless_present_any(&["search", "refresh", "sysupgrade"])
+                .required_unless_present_any(&["search", "clear", "refresh", "sysupgrade"])
                 .action(ArgAction::Set)
                 .num_args(1..),
         )
@@ -83,6 +91,10 @@ pub fn get_sync_handler(sync_matches: &ArgMatches) -> Box<dyn CommandHandler + S
 
     if sync_matches.get_flag("info") {
         return Box::new(info::InfoHandler);
+    }
+
+    if sync_matches.get_flag("clear") {
+        return Box::new(clear::ClearHandler);
     }
 
     let mut composite_handler = CompositeHandler::new();

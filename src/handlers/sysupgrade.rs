@@ -16,7 +16,7 @@ pub struct SysUpgradeHandler;
 #[async_trait]
 impl CommandHandler for SysUpgradeHandler {
     async fn handle(&self, _matches: &clap::ArgMatches, config: &crate::config::Config) {
-        let packages_db = read_database(&config).await.unwrap();
+        let packages_db = read_database().await.unwrap();
         let mut outdated: Vec<(Package, Package)> = Vec::new();
         get_installed_packages()
             .unwrap()
@@ -68,7 +68,7 @@ impl CommandHandler for SysUpgradeHandler {
         }
 
         for (_, package) in outdated.iter() {
-            match download_package(&package, &config).await {
+            match download_package(&package).await {
                 Ok(_) => {
                     eprintln!(
                         "{} updated {}",

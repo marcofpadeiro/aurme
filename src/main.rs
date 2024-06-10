@@ -2,7 +2,7 @@ use std::process::exit;
 
 use clap::{ArgMatches, Command};
 use command_line::{build_sync_command, get_sync_handler};
-use config::{Config, DEFAULT_CONFIG_PATH};
+use config::{Config, CONFIG_PATH};
 use handlers::handler;
 
 mod command_line;
@@ -23,7 +23,7 @@ async fn main() {
         .subcommand(build_sync_command())
         .get_matches();
 
-    let config = match Config::read(DEFAULT_CONFIG_PATH) {
+    let config = match Config::read(CONFIG_PATH) {
         Ok(config) => config,
         Err(e) => {
             eprintln!(

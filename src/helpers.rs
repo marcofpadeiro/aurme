@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::config::VerboseOtion;
+use crate::config::PACKAGES_CACHE_PATH;
 use crate::database::NON_ALPHA;
 use crate::package::Package;
 use crate::theme::colorize;
@@ -53,9 +54,9 @@ pub fn check_packages_existance(
 */
 pub async fn download_package(
     package: &Package,
-    config: &Config,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path = expand_path(config.cache_path.as_str());
+    let cache_path = expand_path(PACKAGES_CACHE_PATH);
+    println!("{}", cache_path.display());
     let package_folder = cache_path.join(&package.name);
 
     if !cache_path.exists() {
@@ -225,15 +226,15 @@ pub fn get_top_packages(package_name: &str, packages_db: &HashMap<String, Vec<Pa
 */
 pub fn makepkg(package_name: &str, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     println!("  {} {}...", colorize(Type::Info, "Building"), package_name);
-    let package_path = expand_path(&config.cache_path).join(package_name);
+    let package_path = expand_path(PACKAGES_CACHE_PATH).join(package_name);
 
     check_dependency("fakeroot");
     check_dependency("make");
 
-    let mut no_confirm = String::from("--noconfirm");
-    if !config.no_confirm {
-        no_confirm = String::from("");
-    }
+    let no_confirm = match &config.no_confirm {
+        true => "--noconfirm",
+        false => "",
+    };
 
     let (stdout, stderr) = config.get_verbose_config();
 

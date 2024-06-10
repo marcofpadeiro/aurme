@@ -8,7 +8,7 @@ pub struct RefreshHandler;
 
 #[async_trait]
 impl CommandHandler for RefreshHandler {
-    async fn handle(&self, _matches: &clap::ArgMatches, config: &crate::config::Config) {
-        download_database(&config).await.unwrap();
+    async fn handle(&self, _matches: &clap::ArgMatches, _config: &crate::config::Config) {
+        download_database().await.unwrap();
     }
 }
