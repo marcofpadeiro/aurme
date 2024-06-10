@@ -56,7 +56,6 @@ pub async fn download_package(
     package: &Package,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let cache_path = expand_path(PACKAGES_CACHE_PATH);
-    println!("{}", cache_path.display());
     let package_folder = cache_path.join(&package.name);
 
     if !cache_path.exists() {

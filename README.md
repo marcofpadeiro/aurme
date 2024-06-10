@@ -29,21 +29,21 @@ The executable will be localated at `target/release/aurme`, you can copy it or c
 
 ## Usage
 
-| Commad | Description |
-| ------ | ----------- |
-|`aurme -S [AUR packages]`| Downloads and installs the specified AUR package(s) and their dependencies |
-|`aurme -Ss <term>`| Searches for packages in the AUR and presents an installation menu |
-|`aurme -Syu [AUR packages]`| Updates the specified AUR package, or updates all AUR packages if no specific package is provided |
-|`aurme -Sc [AUR packages]`| Clears the cache for all AUR packages if no specific package is provided |
+| Commad                     | Description                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `aurme -S [AUR packages]`  | Downloads and installs the specified AUR package(s) and their dependencies                        |
+| `aurme -Ss <term>`         | Searches for packages in the AUR and presents an installation menu                                |
+| `aurme -Sy`                | Syncs local AUR database for newer versions                                                       |
+| `aurme -Su [AUR packages]` | Updates the specified AUR package, or updates all AUR packages if no specific package is provided |
+| `aurme -Sc [AUR packages]` | Clears the cache for all AUR packages if no specific package is provided                          |
 
 ## Configuration
 
 ```json
 {
-  "cache_path": ".cache/aurme",
   "keep_cache": true,
   "no_confirm": false,
-  "verbose": "default" // quiet, verbose
+  "verbose": "Default" // Quiet, Verbose
 }
 ```
 
