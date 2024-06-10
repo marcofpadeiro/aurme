@@ -54,15 +54,14 @@ pub async fn download_database() -> Result<String, Box<dyn std::error::Error>> {
     Ok(json_str)
 }
 
-pub async fn read_database(
-) -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>> {
+pub async fn read_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>> {
     let db_path = expand_path(CACHE_PATH).join(DB_NAME);
 
-    let json: String = if !db_path.exists() {
-        download_database().await?
-    } else {
-        std::fs::read_to_string(db_path)?
-    };
+    if !db_path.exists() {
+        download_database().await?;
+    }
+
+    let json: String = std::fs::read_to_string(db_path)?;
 
     Ok(serde_json::from_str(&json)?)
 }

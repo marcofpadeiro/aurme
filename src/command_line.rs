@@ -108,8 +108,8 @@ pub fn get_sync_handler(sync_matches: &ArgMatches) -> Box<dyn CommandHandler + S
     }
 
     if !composite_handler.handlers.is_empty() {
-        Box::new(composite_handler)
-    } else {
-        Box::new(install::InstallHandler)
-    }
+        return Box::new(composite_handler);
+    } 
+
+    Box::new(install::InstallHandler)
 }
