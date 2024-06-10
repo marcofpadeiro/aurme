@@ -54,7 +54,7 @@ impl CommandHandler for SearchHandler {
                 match download_package(&packages[i - 1]).await {
                     Ok(_) => {
                         makepkg(packages[i - 1].name.as_str(), &config).unwrap();
-                        println!("   {}\n", colorize(Type::Success, "Package installed"));
+                        println!("{}", colorize(Type::Success, "Package installed"));
                     }
                     Err(e) => println!("{} {}", colorize(Type::Error, "\nError:"), e),
                 }

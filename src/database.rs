@@ -16,7 +16,8 @@ use crate::{
 pub const DB_NAME: &str = "packages-meta-ext-v1.json";
 pub const NON_ALPHA: &str = "non_alpha";
 
-pub async fn download_database() -> Result<String, Box<dyn std::error::Error>> {
+pub async fn download_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>>
+{
     println!(
         "{}",
         colorize(Type::Info, "Synchronising package database...")
@@ -36,7 +37,19 @@ pub async fn download_database() -> Result<String, Box<dyn std::error::Error>> {
     let mut json_str = String::new();
     decoder.read_to_string(&mut json_str)?;
 
-    let packages: Vec<Package> = serde_json::from_str(&json_str)?;
+    let alphabet_map = parse_into_alphabet_map(&json_str);
+    let alphabet_json = serde_json::to_string_pretty(&alphabet_map)?;
+
+    let mut json_file = File::create(&json_path)?;
+    json_file.write_all(alphabet_json.as_bytes())?;
+    println!("{}", colorize(Type::Success, "Database is updated!"));
+
+    Ok(alphabet_map)
+}
+
+fn parse_into_alphabet_map(json_str: &String) -> HashMap<String, Vec<Package>> {
+    let packages: Vec<Package> = serde_json::from_str(&json_str)
+        .expect("Invalid json database, please fix or remove invalid file");
     let mut alphabet_map: HashMap<String, Vec<Package>> = HashMap::new();
 
     packages.iter().for_each(|package| {
@@ -46,19 +59,14 @@ pub async fn download_database() -> Result<String, Box<dyn std::error::Error>> {
             .push(package.clone());
     });
 
-    let alphabet_json = serde_json::to_string_pretty(&alphabet_map)?;
-    let mut json_file = File::create(&json_path)?;
-    json_file.write_all(alphabet_json.as_bytes())?;
-    println!("  {}", colorize(Type::Success, "Database is up to date"));
-
-    Ok(json_str)
+    alphabet_map
 }
 
 pub async fn read_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>> {
     let db_path = expand_path(CACHE_PATH).join(DB_NAME);
 
     if !db_path.exists() {
-        download_database().await?;
+        return download_database().await;
     }
 
     let json: String = std::fs::read_to_string(db_path)?;
