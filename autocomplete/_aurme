@@ -47,7 +47,7 @@ _check_db_exists() {
 }
 
 _get_db_packages() {
-    local db_path="$1" word="$2" 
+    local  word="$1" 
 
     aurme -L $word
 }
