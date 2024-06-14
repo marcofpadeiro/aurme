@@ -161,7 +161,7 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
 pub fn name_to_key(package_name: &str) -> String {
     let first_char = package_name.chars().next().unwrap();
     match first_char.is_alphabetic() {
-        true => first_char.to_string(),
+        true => first_char.to_string().to_lowercase(),
         false => NON_ALPHA.to_string(),
     }
 }

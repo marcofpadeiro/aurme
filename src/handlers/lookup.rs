@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use aurme::expand_path;
 
-use crate::database::{read_database, DB_PATH};
+use crate::{database::read_database, helpers::name_to_key};
 
 use super::handler::CommandHandler;
 
@@ -11,18 +10,15 @@ pub struct LookupHandler;
 impl CommandHandler for LookupHandler {
     #[allow(unused)]
     async fn handle(&self, matches: &clap::ArgMatches, config: &crate::config::Config) {
-        let db_path = expand_path(DB_PATH);
-        let word = matches.get_one::<String>("word").unwrap().to_lowercase();
-        let first_letter = word.chars().next().unwrap().to_string();
+        let search_term = matches.get_one::<String>("word").unwrap();
+        let packages_db = read_database().await.unwrap();
 
-        let package_map = read_database().await.unwrap();
-
-        if let Some(packages) = package_map.get(&first_letter) {
-            for package in packages {
-                if package.name.starts_with(&word) {
+        if let Some(packages) = packages_db.get(&name_to_key(search_term)) {
+            packages.iter().for_each(|package| {
+                if package.name.starts_with(&*search_term) {
                     println!("{}", package.name);
                 }
-            }
+            });
         }
     }
 }

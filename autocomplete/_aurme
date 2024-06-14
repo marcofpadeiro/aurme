@@ -1,22 +1,11 @@
 #compdef _aurme aurme
 
 _aurme() {
-    local argument="$words[2]" word="$words[CURRENT]" first_letter completions db_path
+    local argument="$words[2]" word="$words[CURRENT]" completions db_path="$HOME/.cache/aurme/packages-meta.json"
 
     # check if arg was provided
     if [[ $argument != "-S"* || $argument == $word ]]; then
         return  
-    fi
-
-    # check if word is empty
-    first_letter="${(C)word[1,1]}"
-    if [[ -z $first_letter  ]]; then
-      return
-    fi
-
-    #check if first letter is non alpha
-    if [[ ! $first_letter =~ [a-zA-Z] ]]; then
-      first_letter="non_alpha"
     fi
 
     case $argument in
@@ -36,7 +25,6 @@ _aurme() {
 
     compadd -a completions
 }
-
 
 _check_db_exists() {
     local db_path="$1"
