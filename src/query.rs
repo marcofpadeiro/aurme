@@ -40,6 +40,7 @@ pub async fn handle_search(search_term: &String, config: &Config) -> Result<(), 
     Ok(())
 }
 
+#[allow(dead_code, unused)]
 pub fn handle_info(packages: &[&str], config: &Config) -> Result<(), Box<dyn Error>> {
     todo!()
 }

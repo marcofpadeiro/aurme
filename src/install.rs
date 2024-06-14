@@ -49,6 +49,7 @@ pub async fn handle_install(packages: &Vec<&str>, config: &Config) -> Result<(),
     install_packages(&existent_packages, config).await
 }
 
+#[allow(unused)]
 pub async fn handle_sysupgrade(packages: &[&str], config: &Config) -> Result<(), Box<dyn Error>> {
     let packages_db = read_database()?;
     let installed_packages = get_installed_packages()?;
@@ -71,6 +72,8 @@ pub async fn handle_sysupgrade(packages: &[&str], config: &Config) -> Result<(),
     }
 
     let packages = outdated.iter().map(|(_, db)| *db).collect();
+
+    // TODO: check if there is the package in the cache
 
     install_packages(&packages, config).await
 }

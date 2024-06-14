@@ -9,6 +9,7 @@ use crate::{
     theme::{colorize, Type},
 };
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum BuildErrorType {
     Dependency(String),
@@ -16,6 +17,7 @@ enum BuildErrorType {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct BuildError(BuildErrorType, String, Option<Box<dyn std::error::Error>>);
 
 impl Error for BuildError {}
