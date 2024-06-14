@@ -1,0 +1,61 @@
+#compdef _aurme aurme
+
+_aurme() {
+    local argument="$words[2]" word="$words[CURRENT]" first_letter completions db_path
+
+    # check if arg was provided
+    if [[ $argument != "-S"* || $argument == $word ]]; then
+        return  
+    fi
+
+    # check if word is empty
+    first_letter="${(C)word[1,1]}"
+    if [[ -z $first_letter  ]]; then
+      return
+    fi
+
+    #check if first letter is non alpha
+    if [[ ! $first_letter =~ [a-zA-Z] ]]; then
+      first_letter="non_alpha"
+    fi
+
+    db_path="$HOME/.cache/aurme/packages-meta-ext-v1.json"
+
+    case $argument in
+        -Ss | -S*y*)
+            return
+            ;;
+        -S*u*)
+            completions=($(_get_installed_packages $word))
+            ;;
+        *)
+            _check_db_exists $db_path || return
+            completions=($(_get_db_packages $db_path $word $first_letter))
+            ;;
+    esac
+
+    completions=("${(@f)completions}")
+
+    compadd -a completions
+}
+
+
+_check_db_exists() {
+    local db_path="$1"
+
+    if [[ ! -f $db_path ]]; then
+        return
+    fi
+}
+
+_get_db_packages() {
+    local db_path="$1" word="$2" first_letter="$3"
+
+    jq ".$first_letter | .[] | select(.Name | test(\"$word\"; \"i\")) | .Name" "$db_path" | cut -d '"' -f2
+}
+
+_get_installed_packages() {
+    local word="$1"
+
+    pacman -Qm | grep -i "$word" | cut -d ' ' -f1
+}
