@@ -1,16 +1,22 @@
+use flate2::read::GzDecoder;
+use tar::Archive;
+
+use crate::build::build_packages;
+use crate::clean::remove_cache;
+use crate::cli::get_yes_no;
+use crate::cli::print_outdated_packages;
 use crate::config::expand_path;
 use crate::config::PACKAGES_CACHE_PATH;
-use std::{
-    error::Error,
-    io::{stdin, stdout, Write},
-};
+use crate::database::get_installed_packages;
+use crate::query::get_outdated_packages;
+use std::fs::File;
+use std::{error::Error, io::Write};
 
 use crate::{
     config::Config,
-    database::{get_installed_packages, read_database},
-    name_to_key,
+    database::read_database,
     package::Package,
-    query::check_packages_existance,
+    query::query_exact_package,
     theme::{colorize, Type},
 };
 
@@ -19,18 +25,15 @@ pub const AUR_URL: &str = "https://aur.archlinux.org";
 pub async fn handle_install(packages: &Vec<&str>, config: &Config) -> Result<(), Box<dyn Error>> {
     let packages_db = read_database()?;
 
-    let existent_packages: Vec<Package>;
-    let non_existent_packages: Vec<String> = match check_packages_existance(&packages, &packages_db)
-    {
-        Ok((non_existent_packages, packages)) => {
-            existent_packages = packages;
-            non_existent_packages
-        }
-        Err(err) => {
-            println!("{} {}", colorize(Type::Error, "Error:"), err);
-            return Ok(());
-        }
-    };
+    let mut existent_packages: Vec<&Package> = Vec::new();
+    let mut non_existent_packages: Vec<&str> = Vec::new();
+
+    packages
+        .iter()
+        .for_each(|package| match query_exact_package(package, &packages_db) {
+            Some(x) => existent_packages.push(x),
+            None => non_existent_packages.push(package),
+        });
 
     if non_existent_packages.len() > 0 {
         println!(
@@ -43,91 +46,93 @@ pub async fn handle_install(packages: &Vec<&str>, config: &Config) -> Result<(),
         return Ok(());
     }
 
-    let cache_path = expand_path(PACKAGES_CACHE_PATH);
-    let cache_path = std::path::Path::new(&cache_path);
-
-    // temp
-    Ok(())
-    // for package in existent_packages.iter() {
-    //     match download_package(&package).await {
-    //         Ok(_) => {
-    //             makepkg(&package.name, &config).unwrap();
-    //             println!("{}", colorize(Type::Info, "Package installed"));
-    //         }
-    //         Err(e) => {
-    //             println!("{} {}", colorize(Type::Error, "Error:"), e);
-    //             std::fs::remove_dir_all(cache_path.join(&package.name)).unwrap();
-    //         }
-    //     };
-    // }
+    install_packages(&existent_packages, config).await
 }
 
 pub async fn handle_sysupgrade(packages: &[&str], config: &Config) -> Result<(), Box<dyn Error>> {
     let packages_db = read_database()?;
-    let mut outdated: Vec<(Package, Package)> = Vec::new();
-    get_installed_packages()
-        .unwrap()
-        .iter()
-        .for_each(|package| {
-            if let Some(packages) = packages_db.get(&name_to_key(&package.name)) {
-                let db_package = packages.iter().find(|p| p.name == package.name);
-                if let Some(db_package) = db_package {
-                    if db_package.version != package.version {
-                        outdated.push((package.clone(), db_package.clone()));
-                    }
-                }
-            }
-        });
+    let installed_packages = get_installed_packages()?;
+
+    // TODO: updated only specific packages
+
+    let outdated: Vec<(&Package, &Package)> =
+        get_outdated_packages(&installed_packages, &packages_db);
 
     if outdated.len() == 0 {
         println!("{}", colorize(Type::Header, "System is up to date"));
         return Ok(());
     }
 
-    println!(
-        "{}",
-        colorize(
-            Type::Header,
-            format!("Packages ({}) ", outdated.len()).as_str()
-        )
-    );
+    print_outdated_packages(&outdated);
 
-    outdated.iter().for_each(|(local, db)| {
-        println!(
-            "   {} ({} -> {})",
-            local.name,
-            colorize(Type::Error, &local.version),
-            colorize(Type::Success, &db.version),
-        );
-    });
-
-    print!("\nProceed with update? [Y/n]:");
-    stdout().flush().unwrap();
-
-    let mut input = String::new();
-    stdin().read_line(&mut input).unwrap();
-
-    let input = input.trim();
-
-    if input != "" && input != "y" && input != "Y" {
+    if !get_yes_no("Proceed with update?") {
         println!("{}", colorize(Type::Warning, "Aborting..."));
         return Ok(());
     }
 
-    //temp
-    Ok(())
+    let packages = outdated.iter().map(|(_, db)| *db).collect();
 
-    // for (_, package) in outdated.iter() {
-    //     match download_package(&package).await {
-    //         Ok(_) => {
-    //             eprintln!(
-    //                 "{} updated {}",
-    //                 colorize(Type::Success, "Successfully"),
-    //                 package.name
-    //             );
-    //             makepkg(package.name.as_str(), &config).unwrap();
-    //         }
-    //         Err(e) => println!("{} {}", colorize(Type::Error, "Error:"), e),
-    //     };
-    // }
+    install_packages(&packages, config).await
+}
+
+/// The argument `packages` is assumed to have already been validated for their existance on AUR
+pub async fn install_packages(
+    packages: &Vec<&Package>,
+    config: &Config,
+) -> Result<(), Box<dyn std::error::Error>> {
+    download_packages(packages).await?;
+    build_packages(packages, config)
+}
+
+async fn download_packages(packages: &Vec<&Package>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut successfully_downloaded: Vec<&Package> = Vec::new();
+    for package in packages {
+        match download(&package).await {
+            Ok(_) => {
+                successfully_downloaded.push(package);
+                eprintln!(
+                    "{} downloaded {}",
+                    colorize(Type::Success, "Successfully"),
+                    package.name
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "{} to download {}",
+                    colorize(Type::Error, "Failed"),
+                    package.name
+                );
+                remove_cache(successfully_downloaded)?;
+                return Err(e);
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn download(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
+    let cache_path = expand_path(PACKAGES_CACHE_PATH);
+    let package_folder = cache_path.join(&package.name);
+
+    if !cache_path.exists() {
+        std::fs::create_dir_all(&cache_path).expect("Failed to create cache directory");
+    }
+
+    if package_folder.exists() {
+        std::fs::remove_dir_all(package_folder).expect("Failed to remove old package");
+    }
+
+    let response = reqwest::get(package.get_url_path()).await?.bytes().await?;
+    let file_path = cache_path.join(format!("{}.tar.gz", package.name));
+
+    let decoder = GzDecoder::new(&response[..]);
+
+    let mut file = File::create(&file_path)?;
+    file.write_all(&response)?;
+
+    let mut archive = Archive::new(decoder);
+
+    archive.unpack(cache_path)?;
+
+    Ok(())
 }

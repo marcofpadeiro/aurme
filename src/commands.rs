@@ -1,4 +1,4 @@
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, Command};
 
 pub fn build_lookup_command() -> Command {
     Command::new("lookup")

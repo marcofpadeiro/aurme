@@ -1,66 +1,43 @@
 use clap::ArgMatches;
 
+use crate::cli::{get_value_from_range, print_top_packages};
+use crate::install::install_packages;
 use crate::name_to_key;
 use crate::package::Package;
-use crate::theme::colorize;
-use crate::theme::Type;
+use crate::theme::{colorize, Type};
 use std::collections::HashMap;
 use std::error::Error;
-use std::io;
-use std::io::Write;
+use std::process::exit;
 
 use crate::{config::Config, database::read_database};
 
 pub async fn handle_search(search_term: &String, config: &Config) -> Result<(), Box<dyn Error>> {
-    let packages_db = read_database()?;
+    let packages_db = match read_database() {
+        Ok(x) => x,
+        Err(_) => {
+            eprintln!(
+                "{} to read database. Try to {} to refresh the local database",
+                colorize(Type::Error, "Failed"),
+                colorize(Type::Info, "aurme -Sy"),
+            );
+            exit(1);
+        }
+    };
 
-    let packages = get_top_packages(&search_term, &packages_db);
+    let top_packages = get_top_packages(&search_term, &packages_db);
 
-    let len = packages.len();
-    if len == 0 {
+    if top_packages.len() == 0 {
         println!("No packages found");
         return Ok(());
     }
 
-    packages.iter().rev().enumerate().for_each(|(i, package)| {
-        println!(
-            "\n{} {}\n  {}",
-            colorize(Type::Info, format!("{} ┃", len - i).as_str()),
-            colorize(Type::Header, package.name.as_str()),
-            package.get_description()
-        );
-    });
+    print_top_packages(&top_packages);
 
-    print!("\nInstall package(s) (1-10) or (q)uit: ");
-    io::stdout().flush().unwrap();
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-
-    let input = input.trim();
-
-    if input == "q" || input == "quit" {
-        return Ok(());
+    if let Some(i) = get_value_from_range("Install package(s)", 1, 10)? {
+        return install_packages(&vec![top_packages[i - 1]], config).await;
     }
 
-    let parsed_input: Result<usize, _> = input.parse();
-
-    // temp
     Ok(())
-
-    // match parsed_input {
-    //     Ok(i) if i > 0 && i <= packages.len() => match download_package(&packages[i - 1]).await {
-    //         Ok(_) => {
-    //             makepkg(packages[i - 1].name.as_str(), &config).unwrap();
-    //             println!("{}", colorize(Type::Success, "Package installed"));
-    //         }
-    //         Err(e) => println!("{} {}", colorize(Type::Error, "\nError:"), e),
-    //     },
-    //     _ => println!(
-    //         "{}",
-    //         colorize(Type::Warning, "Invalid input or package out of range")
-    //     ),
-    // }
 }
 
 pub fn handle_info(packages: &[&str], config: &Config) -> Result<(), Box<dyn Error>> {
@@ -79,11 +56,11 @@ pub async fn handle_lookup(lookup_matches: &ArgMatches) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-fn get_top_packages(
+fn get_top_packages<'a>(
     package_name: &str,
-    packages_db: &HashMap<String, Vec<Package>>,
-) -> Vec<Package> {
-    let mut top_packages: Vec<Package> = packages_db
+    packages_db: &'a HashMap<String, Vec<Package>>,
+) -> Vec<&'a Package> {
+    let mut top_packages: Vec<&Package> = packages_db
         .iter()
         .flat_map(|(_, packages)| packages.iter())
         .filter(|package| {
@@ -96,7 +73,7 @@ fn get_top_packages(
                     .to_lowercase()
                     .contains(&package_name.to_lowercase())
         })
-        .map(|package| package.clone())
+        .map(|package| package)
         .collect();
 
     if top_packages.is_empty() {
@@ -118,30 +95,36 @@ fn print_packages_matching(search_term: &String, packages: HashMap<String, Vec<P
     }
 }
 
-pub fn check_packages_existance(
-    package_names: &Vec<&str>,
-    packages_db: &HashMap<String, Vec<Package>>,
-) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
-    let mut existent_packages: Vec<Package> = Vec::new();
-    package_names.iter().for_each(|package| {
-        if let Some(packages) = packages_db.get(&name_to_key(package)) {
-            let package = packages.iter().find(|p| p.name == *package);
-            if let Some(package) = package {
-                existent_packages.push(package.clone());
+pub fn query_exact_package<'a>(
+    package: &str,
+    database: &'a HashMap<String, Vec<Package>>,
+) -> Option<&'a Package> {
+    if let Some(packages) = database.get(&name_to_key(package)) {
+        return packages.iter().find(|p| p.name == *package);
+    }
+    None
+}
+
+pub fn get_outdated_packages<'a, 'b>(
+    installed_packages: &'a Vec<Package>,
+    database: &'b HashMap<String, Vec<Package>>,
+) -> Vec<(&'a Package, &'b Package)> {
+    let mut outdated: Vec<(&Package, &Package)> = Vec::new();
+
+    installed_packages.iter().for_each(|package| {
+        let db_package = match query_exact_package(&package.name, database) {
+            Some(x) => x,
+            None => {
+                if !package.name.ends_with("debug") {
+                    eprintln!("Package {} no longer exists in AUR", package.name);
+                }
+                return;
             }
+        };
+        if db_package.version != package.version {
+            outdated.push((package, db_package));
         }
     });
 
-    // filter out the packages that don't exist
-    let non_existent = package_names
-        .iter()
-        .filter(|package_name| {
-            !existent_packages
-                .iter()
-                .any(|package| package.name == **package_name)
-        })
-        .map(|package_name| package_name.to_string())
-        .collect();
-
-    Ok((non_existent, existent_packages))
+    outdated
 }

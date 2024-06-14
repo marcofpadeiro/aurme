@@ -19,14 +19,16 @@ pub const DB_PATH: &str = "~/.cache/aurme/packages-meta.json";
 
 pub async fn download_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>>
 {
+    let cache_path = expand_path(CACHE_PATH);
+    let db_path = expand_path(DB_PATH);
+
     println!(
         "{}",
         colorize(Type::Info, "Synchronising package database...")
     );
-    let db_path = expand_path(DB_PATH);
 
-    if let Err(_) = std::fs::metadata(&CACHE_PATH) {
-        std::fs::create_dir_all(&CACHE_PATH)?;
+    if let Err(_) = std::fs::metadata(&cache_path) {
+        std::fs::create_dir_all(&cache_path)?;
     }
 
     let url = format!("{}/packages-meta-ext-v1.json.gz", AUR_URL);
@@ -77,13 +79,10 @@ pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Erro
         .output()
         .expect("Failed to get installed packages");
 
-    // Extract the installed packages as a string
     let installed_packages_str = std::str::from_utf8(&installed_packages_output.stdout)?;
 
-    // Split the string into individual package names
     let package_lines: Vec<&str> = installed_packages_str.trim().split('\n').collect();
 
-    // Split each line into name and version
     let installed_packages: Vec<Package> = package_lines
         .into_iter()
         .map(|package_line| {

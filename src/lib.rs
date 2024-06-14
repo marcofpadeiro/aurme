@@ -1,4 +1,6 @@
+mod build;
 mod clean;
+mod cli;
 mod config;
 mod database;
 mod install;
@@ -79,11 +81,11 @@ async fn handle_sync(sync_matches: &ArgMatches, config: &Config) -> Result<(), B
     };
 
     if sync_matches.get_flag("info") {
-        handle_info(&packages, &config)?;
+        return handle_info(&packages, &config);
     };
 
     if sync_matches.get_flag("clear") {
-        handle_clean(&packages, &config)?;
+        return handle_clean(&packages);
     };
 
     handle_install(&packages, &config).await
