@@ -1,4 +1,4 @@
-use std::{env, path::Path, process::Command};
+use std::{path::Path, process::Command};
 
 fn main() {
     let src = Path::new("autocomplete/_aurme");
@@ -11,17 +11,4 @@ fn main() {
         .arg(dst)
         .output()
         .expect("failed to execute process");
-
-    if env::var("PROFILE").unwrap() == "release" {
-        println!();
-        println!("cargo:warning=Adding aurme to your PATH");
-        let src = Path::new("target/release/aurme");
-        let dst = Path::new("/usr/bin/aurme");
-        Command::new("sudo")
-            .arg("cp")
-            .arg(src)
-            .arg(dst)
-            .output()
-            .expect("failed to execute process");
-    }
 }
