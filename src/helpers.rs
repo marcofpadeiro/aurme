@@ -14,39 +14,11 @@ use std::process::Command;
 use tar::Archive;
 
 // variables and structs for ease of use
-pub const AUR_URL: &str = "https://aur.archlinux.org";
 
 /**
 * helper function to check if package exists @param package_name: the name of the package
 * @return true if the package exists, false otherwise
 */
-pub fn check_packages_existance(
-    package_names: &Vec<&str>,
-    packages_db: &HashMap<String, Vec<Package>>,
-) -> Result<(Vec<String>, Vec<Package>), Box<dyn std::error::Error>> {
-    let mut existent_packages: Vec<Package> = Vec::new();
-    package_names.iter().for_each(|package| {
-        if let Some(packages) = packages_db.get(&name_to_key(package)) {
-            let package = packages.iter().find(|p| p.name == *package);
-            if let Some(package) = package {
-                existent_packages.push(package.clone());
-            }
-        }
-    });
-
-    // filter out the packages that don't exist
-    let non_existent = package_names
-        .iter()
-        .filter(|package_name| {
-            !existent_packages
-                .iter()
-                .any(|package| package.name == **package_name)
-        })
-        .map(|package_name| package_name.to_string())
-        .collect();
-
-    Ok((non_existent, existent_packages))
-}
 
 /**
 * Clone a package from the AUR
@@ -158,14 +130,6 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
     Err(packages_missing)
 }
 
-pub fn name_to_key(package_name: &str) -> String {
-    let first_char = package_name.chars().next().unwrap();
-    match first_char.is_alphabetic() {
-        true => first_char.to_string().to_lowercase(),
-        false => NON_ALPHA.to_string(),
-    }
-}
-
 /**
 * Checks if a dependency is installed in the system
 * @param dependency_name: the name of the dependency
@@ -191,34 +155,6 @@ pub fn check_dependency(dependency_name: &str) {
 * @param package_name: the package name to search for
 * @return a vector of the top 10 packages
 */
-pub fn get_top_packages(
-    package_name: &str,
-    packages_db: &HashMap<String, Vec<Package>>,
-) -> Vec<Package> {
-    let mut top_packages: Vec<Package> = packages_db
-        .iter()
-        .flat_map(|(_, packages)| packages.iter())
-        .filter(|package| {
-            package
-                .name
-                .to_lowercase()
-                .contains(&package_name.to_lowercase())
-                || package
-                    .get_description()
-                    .to_lowercase()
-                    .contains(&package_name.to_lowercase())
-        })
-        .map(|package| package.clone())
-        .collect();
-
-    if top_packages.is_empty() {
-        return top_packages;
-    }
-
-    top_packages.sort_by(|a, b| b.popularity.partial_cmp(&a.popularity).unwrap());
-    top_packages.truncate(10);
-    top_packages
-}
 
 /**
 * Runs makepkg command to build a package
