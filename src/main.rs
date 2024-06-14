@@ -1,17 +1,7 @@
-use std::process::exit;
-
-use clap::{ArgMatches, Command};
-use command_line::{build_lookup_command, build_sync_command, get_sync_handler};
-use config::{Config, CONFIG_PATH};
-use handlers::{handler, lookup};
-
-mod command_line;
-mod config;
-mod database;
-mod handlers;
-mod helpers;
-mod package;
-mod theme;
+use aurme::run;
+use clap::Command;
+use commands::{build_lookup_command, build_sync_command};
+mod commands;
 
 #[tokio::main]
 async fn main() {
@@ -24,24 +14,5 @@ async fn main() {
         .subcommand(build_lookup_command())
         .get_matches();
 
-    let config = match Config::read(CONFIG_PATH) {
-        Ok(config) => config,
-        Err(e) => {
-            eprintln!(
-                "{}: {}",
-                theme::colorize(theme::Type::Error, "Error getting config file"),
-                e
-            );
-            exit(1);
-        }
-    };
-
-    let (command_handler, res_matches): (Box<dyn handler::CommandHandler>, &ArgMatches) =
-        match matches.subcommand() {
-            Some(("sync", sync_matches)) => (get_sync_handler(sync_matches), sync_matches),
-            Some(("lookup", lookup_matches)) => (Box::new(lookup::LookupHandler), lookup_matches),
-            _ => unreachable!(),
-        };
-
-    command_handler.handle(res_matches, &config).await;
+    run(matches).await;
 }

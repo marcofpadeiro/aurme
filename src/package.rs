@@ -1,4 +1,4 @@
-use crate::helpers::AUR_URL;
+use crate::install::AUR_URL;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

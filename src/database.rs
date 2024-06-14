@@ -1,31 +1,34 @@
-use aurme::expand_path;
+use crate::config::expand_path;
+use crate::install::AUR_URL;
+use crate::name_to_key;
 use flate2::read::GzDecoder;
 use std::{
     collections::HashMap,
     fs::File,
     io::{Read, Write},
+    process::Command,
 };
 
 use crate::{
     config::CACHE_PATH,
-    helpers::{name_to_key, AUR_URL},
     package::Package,
     theme::{colorize, Type},
 };
 
 pub const DB_PATH: &str = "~/.cache/aurme/packages-meta.json";
-pub const NON_ALPHA: &str = "non_alpha";
 
 pub async fn download_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>>
 {
+    let cache_path = expand_path(CACHE_PATH);
+    let db_path = expand_path(DB_PATH);
+
     println!(
         "{}",
         colorize(Type::Info, "Synchronising package database...")
     );
-    let db_path = expand_path(DB_PATH);
 
-    if let Err(_) = std::fs::metadata(&CACHE_PATH) {
-        std::fs::create_dir_all(&CACHE_PATH)?;
+    if let Err(_) = std::fs::metadata(&cache_path) {
+        std::fs::create_dir_all(&cache_path)?;
     }
 
     let url = format!("{}/packages-meta-ext-v1.json.gz", AUR_URL);
@@ -61,14 +64,35 @@ fn parse_into_alphabet_map(json_str: &String) -> HashMap<String, Vec<Package>> {
     alphabet_map
 }
 
-pub async fn read_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>> {
+pub fn read_database() -> Result<HashMap<String, Vec<Package>>, Box<dyn std::error::Error>> {
     let db_path = expand_path(DB_PATH);
-
-    if !db_path.exists() {
-        return download_database().await;
-    }
 
     let json: String = std::fs::read_to_string(db_path)?;
 
     Ok(serde_json::from_str(&json)?)
+}
+
+// temp
+pub fn get_installed_packages() -> Result<Vec<Package>, Box<dyn std::error::Error>> {
+    let installed_packages_output = Command::new("pacman")
+        .arg("-Qm")
+        .output()
+        .expect("Failed to get installed packages");
+
+    let installed_packages_str = std::str::from_utf8(&installed_packages_output.stdout)?;
+
+    let package_lines: Vec<&str> = installed_packages_str.trim().split('\n').collect();
+
+    let installed_packages: Vec<Package> = package_lines
+        .into_iter()
+        .map(|package_line| {
+            let mut package_parts = package_line.split_whitespace();
+            let name = package_parts.next().unwrap_or("").to_owned();
+            let version = package_parts.next().unwrap_or("").to_owned();
+
+            Package::new(name, None, Some(version), None, None, None)
+        })
+        .collect();
+
+    Ok(installed_packages)
 }

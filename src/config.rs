@@ -1,6 +1,7 @@
-use std::{path::PathBuf, process::Stdio};
+use home::home_dir;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
 
-use aurme::expand_path;
 use serde::{Deserialize, Serialize};
 
 use crate::theme;
@@ -8,7 +9,6 @@ use crate::theme;
 pub const CACHE_PATH: &str = "~/.cache/aurme";
 pub const PACKAGES_CACHE_PATH: &str = "~/.cache/aurme/packages";
 pub const CONFIG_PATH: &str = "~/.config/aurme/config.json";
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum VerboseOtion {
@@ -80,4 +80,23 @@ impl Config {
             VerboseOtion::Default => (std::process::Stdio::piped(), std::process::Stdio::inherit()),
         }
     }
+}
+
+pub fn expand_path(path: &str) -> PathBuf {
+    let mut expanded_path = path.to_string();
+
+    if expanded_path.starts_with("~") {
+        if let Some(home) = home_dir() {
+            let home_str = home.to_str().unwrap_or("~");
+            expanded_path = expanded_path.replacen("~", home_str, 1);
+        }
+    }
+
+    if expanded_path.contains('$') {
+        expanded_path = shellexpand::env(&expanded_path)
+            .unwrap_or_else(|_| expanded_path.clone().into())
+            .to_string();
+    }
+
+    Path::new(&expanded_path).to_path_buf()
 }
