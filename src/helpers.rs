@@ -52,9 +52,7 @@ pub fn check_packages_existance(
 * Clone a package from the AUR
 * @param package_name: the name of the package
 */
-pub async fn download_package(
-    package: &Package,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn download_package(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
     let cache_path = expand_path(PACKAGES_CACHE_PATH);
     let package_folder = cache_path.join(&package.name);
 
@@ -163,7 +161,7 @@ pub fn check_if_packages_installed(packages: Vec<String>) -> Result<Vec<Package>
 pub fn name_to_key(package_name: &str) -> String {
     let first_char = package_name.chars().next().unwrap();
     match first_char.is_alphabetic() {
-        true => first_char.to_uppercase().to_string(),
+        true => first_char.to_string(),
         false => NON_ALPHA.to_string(),
     }
 }
@@ -193,7 +191,10 @@ pub fn check_dependency(dependency_name: &str) {
 * @param package_name: the package name to search for
 * @return a vector of the top 10 packages
 */
-pub fn get_top_packages(package_name: &str, packages_db: &HashMap<String, Vec<Package>>) -> Vec<Package> {
+pub fn get_top_packages(
+    package_name: &str,
+    packages_db: &HashMap<String, Vec<Package>>,
+) -> Vec<Package> {
     let mut top_packages: Vec<Package> = packages_db
         .iter()
         .flat_map(|(_, packages)| packages.iter())

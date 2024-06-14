@@ -1,9 +1,9 @@
 use std::process::exit;
 
 use clap::{ArgMatches, Command};
-use command_line::{build_sync_command, get_sync_handler};
+use command_line::{build_lookup_command, build_sync_command, get_sync_handler};
 use config::{Config, CONFIG_PATH};
-use handlers::handler;
+use handlers::{handler, lookup};
 
 mod command_line;
 mod config;
@@ -21,6 +21,7 @@ async fn main() {
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(build_sync_command())
+        .subcommand(build_lookup_command())
         .get_matches();
 
     let config = match Config::read(CONFIG_PATH) {
@@ -38,6 +39,7 @@ async fn main() {
     let (command_handler, res_matches): (Box<dyn handler::CommandHandler>, &ArgMatches) =
         match matches.subcommand() {
             Some(("sync", sync_matches)) => (get_sync_handler(sync_matches), sync_matches),
+            Some(("lookup", lookup_matches)) => (Box::new(lookup::LookupHandler), lookup_matches),
             _ => unreachable!(),
         };
 

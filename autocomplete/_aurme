@@ -19,8 +19,6 @@ _aurme() {
       first_letter="non_alpha"
     fi
 
-    db_path="$HOME/.cache/aurme/packages-meta-ext-v1.json"
-
     case $argument in
         -Ss | -S*y*)
             return
@@ -30,7 +28,7 @@ _aurme() {
             ;;
         *)
             _check_db_exists $db_path || return
-            completions=($(_get_db_packages $db_path $word $first_letter))
+            completions=($(_get_db_packages $word))
             ;;
     esac
 
@@ -49,9 +47,9 @@ _check_db_exists() {
 }
 
 _get_db_packages() {
-    local db_path="$1" word="$2" first_letter="$3"
+    local db_path="$1" word="$2" 
 
-    jq ".$first_letter | .[] | select(.Name | test(\"$word\"; \"i\")) | .Name" "$db_path" | cut -d '"' -f2
+    aurme -L $word
 }
 
 _get_installed_packages() {

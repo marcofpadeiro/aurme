@@ -29,6 +29,20 @@ impl handler::CommandHandler for CompositeHandler {
     }
 }
 
+pub fn build_lookup_command() -> Command {
+    Command::new("lookup")
+        .short_flag('L')
+        .long_flag("lookup")
+        .about("Lookup packages on database (used for autocomplete)")
+        .arg(
+            Arg::new("word")
+                .help("word")
+                .action(ArgAction::Set)
+                .required(true)
+                .index(1),
+        )
+}
+
 pub fn build_sync_command() -> Command {
     Command::new("sync")
         .short_flag('S')
@@ -109,7 +123,7 @@ pub fn get_sync_handler(sync_matches: &ArgMatches) -> Box<dyn CommandHandler + S
 
     if !composite_handler.handlers.is_empty() {
         return Box::new(composite_handler);
-    } 
+    }
 
     Box::new(install::InstallHandler)
 }
