@@ -4,7 +4,7 @@ use which::which;
 
 use crate::{
     clean::remove_cache,
-    config::{expand_path, Config, PACKAGES_CACHE_PATH},
+    config::{self, expand_path, Config, VerboseOtion, PACKAGES_CACHE_PATH},
     package::Package,
     theme::{colorize, Type},
 };
@@ -72,11 +72,17 @@ fn build(package: &Package, path: &PathBuf, config: &Config) -> Result<(), Box<d
     }
 
     if exit_status.status.code().unwrap() != 0 {
+        let err_msg = match config.verbose {
+            VerboseOtion::Quiet => "Enable verbose and check above logs",
+            _ => "Check above logs",
+        };
+        // TODO: Maybe make it non blocking
         return Err(Box::new(BuildError(
             BuildErrorType::BuildProcess(package.name.to_owned()),
             format!(
-                "Makepkg failed to build package \"{}\". Check above logs",
-                package.name
+                "Makepkg failed to build package \"{}\". {}",
+                package.name,
+                err_msg
             ),
             None,
         )));

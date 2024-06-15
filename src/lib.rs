@@ -42,7 +42,7 @@ pub async fn run(matches: ArgMatches) {
     };
 
     if let Err(e) = result {
-        eprintln!("{}: {}", theme::colorize(theme::Type::Error, "Error: "), e);
+        eprintln!("{} {}", theme::colorize(theme::Type::Error, "Error:"), e);
     }
 }
 
@@ -66,11 +66,6 @@ async fn handle_sync(sync_matches: &ArgMatches, config: &Config) -> Result<(), B
         .get_many::<String>("package")
         .map(|vals| vals.map(|s| s.as_str()).collect())
         .unwrap_or_else(Vec::new);
-
-    if sync_matches.get_flag("refresh") && sync_matches.get_flag("sysupgrade") {
-        download_database().await?;
-        handle_sysupgrade(&packages, &config).await?;
-    };
 
     if sync_matches.get_flag("refresh") {
         download_database().await?;

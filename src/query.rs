@@ -26,14 +26,15 @@ pub async fn handle_search(search_term: &String, config: &Config) -> Result<(), 
 
     let top_packages = get_top_packages(&search_term, &packages_db);
 
-    if top_packages.len() == 0 {
+    let len = top_packages.len();
+    if len == 0 {
         println!("No packages found");
         return Ok(());
     }
 
     print_top_packages(&top_packages);
 
-    if let Some(i) = get_value_from_range("Install package(s)", 1, 10)? {
+    if let Some(i) = get_value_from_range("Install package(s)", 1, len)? {
         return install_packages(&vec![top_packages[i - 1]], config).await;
     }
 
@@ -117,7 +118,16 @@ pub fn get_outdated_packages<'a, 'b>(
             Some(x) => x,
             None => {
                 if !package.name.ends_with("debug") {
-                    eprintln!("Package {} no longer exists in AUR", package.name);
+                    eprintln!(
+                        "{}",
+                        colorize(
+                            Type::Warning,
+                            &format!(
+                                "Package {} no longer exists in AUR. Skipping...",
+                                package.name
+                            )
+                        )
+                    );
                 }
                 return;
             }

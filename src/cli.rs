@@ -60,12 +60,22 @@ pub fn get_value_from_range<'a>(
 
     let mut input = String::new();
     stdin().read_line(&mut input)?;
-
-    let input = input.trim();
+    input = input.trim().to_string();
 
     if input == "q" || input == "quit" || input == "" {
         return Ok(None);
     }
 
-    Ok(Some(input.parse::<usize>()?))
+    let parsed_input = input.parse::<usize>().unwrap_or(0);
+
+    if parsed_input < min || parsed_input > max {
+        return Err(format!(
+            "Input out of range must be between [{}; {}]",
+            min,
+            max
+        )
+        .into());
+    }
+
+    Ok(Some(parsed_input))
 }
