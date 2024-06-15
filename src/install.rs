@@ -49,12 +49,28 @@ pub async fn handle_install(packages: &Vec<&str>, config: &Config) -> Result<(),
     install_packages(&existent_packages, config).await
 }
 
-#[allow(unused)]
 pub async fn handle_sysupgrade(packages: &[&str], config: &Config) -> Result<(), Box<dyn Error>> {
     let packages_db = read_database()?;
-    let installed_packages = get_installed_packages()?;
+    let mut installed_packages = get_installed_packages()?;
 
-    // TODO: updated only specific packages
+    if packages.len() > 0 {
+        let invalid = packages.iter().filter(|package| {
+            !installed_packages.iter().any(|x| x.name == **package)
+        }).collect::<Vec<&&str>>();
+
+        if invalid.len() > 0 {
+            println!(
+                "{} The following packages are not installed:",
+                colorize(Type::Warning, "Warning:")
+            );
+            invalid.iter().for_each(|package| {
+                println!("  {}", package);
+            });
+            println!();
+        }
+
+        installed_packages.retain(|x| packages.contains(&x.name.as_str()));
+    }
 
     let outdated: Vec<(&Package, &Package)> =
         get_outdated_packages(&installed_packages, &packages_db);

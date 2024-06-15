@@ -72,7 +72,7 @@ async fn handle_sync(sync_matches: &ArgMatches, config: &Config) -> Result<(), B
     };
 
     if sync_matches.get_flag("sysupgrade") {
-        handle_sysupgrade(&packages, &config).await?;
+        return Ok(handle_sysupgrade(&packages, &config).await?);
     };
 
     if sync_matches.get_flag("info") {

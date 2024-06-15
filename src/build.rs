@@ -4,7 +4,7 @@ use which::which;
 
 use crate::{
     clean::remove_cache,
-    config::{self, expand_path, Config, VerboseOtion, PACKAGES_CACHE_PATH},
+    config::{expand_path, Config, VerboseOtion, PACKAGES_CACHE_PATH},
     package::Package,
     theme::{colorize, Type},
 };

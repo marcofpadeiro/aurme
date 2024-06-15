@@ -55,17 +55,23 @@ impl Config {
             return Ok(default);
         }
 
-        let json = std::fs::read_to_string(config_path)?;
-        match serde_json::from_str::<Config>(&json) {
-            Ok(config) => return Ok(config),
-            Err(_) => eprintln!(
-                "{}",
-                theme::colorize(
-                    theme::Type::Warning,
-                    "Couldn't read config file. Running off the default config"
-                )
-            ),
-        };
+        let json = std::fs::read_to_string(config_path.to_owned())?;
+        if let Ok(config) = serde_json::from_str::<Config>(&json) {
+            return Ok(config);
+        }
+
+        eprintln!(
+            "{}",
+            theme::colorize(
+                theme::Type::Warning,
+                "Couldn't read config file.
+                \nYour config file will be overwritten with the default config.
+                \nOld config file has been renamed to config.old.\n"
+            )
+        );
+
+        std::fs::rename(&config_path, config_path.with_extension("old"))?;
+        Config::create(&Config::default(), &config_path)?;
 
         Ok(Config::default())
     }
