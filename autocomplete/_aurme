@@ -37,7 +37,7 @@ _check_db_exists() {
 _get_db_packages() {
     local  word="$1" 
 
-    aurme -L $word
+    aurme -L $word 2> /dev/null
 }
 
 _get_installed_packages() {
