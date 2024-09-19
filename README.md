@@ -21,11 +21,8 @@ The AUR is a great community driven repository with all type of packages and con
 ```
 sudo pacman -S --needed cargo
 git clone https://github.com/marcofpadeiro/aurme
-cd aurme
-cargo build --release
+./install.sh
 ```
-
-The executable will be localated at `target/release/aurme`, you can copy it or create a symmlink to `/usr/bin`
 
 ## Usage
 
@@ -36,16 +33,6 @@ The executable will be localated at `target/release/aurme`, you can copy it or c
 | `aurme -Sy`                | Syncs local AUR database for newer versions                                                       |
 | `aurme -Su [AUR packages]` | Updates the specified AUR package, or updates all AUR packages if no specific package is provided |
 | `aurme -Sc [AUR packages]` | Clears the cache for all AUR packages if no specific package is provided                          |
-
-## Configuration
-
-```json
-{
-  "keep_cache": true,
-  "no_confirm": false,
-  "verbose": "Default" // Quiet, Verbose
-}
-```
 
 ## Future
 
@@ -61,6 +48,6 @@ This project is still on a really early phase and there are still a lot of featu
 - On install print the required dependencies
 - ~~Config file to setup preferences~~
 - Pull latests changes of a package without building it
-- Command line autocomplete for zsh bash and fish
+- Command line autocomplete for ~~zsh~~ bash and fish
 
 ![](https://media.tenor.com/Hw0aKasI6B4AAAAC/fast-blazing-fast.gif)

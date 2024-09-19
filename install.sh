@@ -24,6 +24,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo -ne "${TAB}"
+./target/release/aurme -Sy
+
 echo -ne "${TAB}${Y}Do you want to install Aurme to /usr/bin? [Y/n]: ${NC}"
 
 read -r answer

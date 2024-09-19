@@ -7,7 +7,7 @@ mod commands;
 async fn main() {
     let matches = Command::new("aurme")
         .about("AUR wrapper utility")
-        .version("0.0.1")
+        .version("0.0.1.1")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(build_sync_command())
